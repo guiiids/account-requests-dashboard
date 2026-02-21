@@ -495,6 +495,16 @@ def import_request():
 
 
 # =============================================================================
+# Health Check (required by Docker / Azure App Service)
+# =============================================================================
+
+@app.route('/healthz')
+def healthz():
+    """Lightweight liveness probe used by the Docker HEALTHCHECK and Azure."""
+    return jsonify({'status': 'ok'}), 200
+
+
+# =============================================================================
 # Error Handlers
 # =============================================================================
 
