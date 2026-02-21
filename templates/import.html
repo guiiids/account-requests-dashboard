@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Import Request{% endblock %}
+{% block page_title %}Import Request{% endblock %}
+
+{% block content %}
+<div class="import-wrapper">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2 class="card-title">
+                <i class="ph ph-envelope-open"></i>
+                Import from Email
+            </h2>
+        </div>
+
+        <p class="import-instructions">
+            Paste the raw content of an account request email below. The system will automatically parse the requester's
+            details.
+        </p>
+
+        {% if error %}
+        <div class="alert alert-danger mb-4"
+            style="background: var(--danger-bg); color: var(--danger); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
+            <i class="ph ph-warning-circle"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label class="form-label">Subject Line</label>
+                <input type="text" name="subject" class="form-input" placeholder="e.g. New Account Request - John Doe">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Body</label>
+                <textarea name="body" class="form-textarea" rows="12"
+                    placeholder="Paste email content here..."></textarea>
+            </div>
+
+            <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="ph ph-magic-wand"></i>
+                    Process Request
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Help / Context -->
+    <div class="help-box">
+        <h4 style="font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="ph ph-info"></i>
+            Expected Format
+        </h4>
+        <p style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 1rem;">
+            The parser looks for standard fields in the email body. Ensure the text contains lines similar to:
+        </p>
+        <ul style="font-size: 0.9rem; margin-left: 1.5rem; line-height: 1.6;">
+            <li><strong>Name:</strong> [First Last]</li>
+            <li><strong>Email:</strong> [user@example.com]</li>
+            <li><strong>Organization:</strong> [Company/Institution Name]</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

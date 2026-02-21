@@ -1,0 +1,358 @@
+"""
+Database Module for Account Requests Dashboard
+Handles local SQLite database for storing account requests and comments.
+"""
+import sqlite3
+import os
+from datetime import datetime
+
+DB_NAME = 'account_requests.db'
+
+def get_db_path():
+    """Get absolute path to the database file."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), DB_NAME)
+
+def get_connection():
+    """Get a connection to the SQLite database."""
+    conn = sqlite3.connect(get_db_path())
+    conn.row_factory = sqlite3.Row  # Return rows as dict-like objects
+    return conn
+
+def init_db():
+    """Initialize database tables."""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Create requests table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_key TEXT UNIQUE NOT NULL,
+            status TEXT DEFAULT 'Open',
+            requester_email TEXT NOT NULL,
+            requester_name TEXT,
+            organization TEXT,
+            request_type TEXT DEFAULT 'Account Request',
+            original_subject TEXT,
+            original_body TEXT,
+            source_email_id TEXT,
+            conversation_id TEXT,
+            assigned_to TEXT,
+            ilab_link TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            closed_at TIMESTAMP
+        )
+    ''')
+    
+    # Create request_comments table for internal notes and email trail
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS request_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id INTEGER NOT NULL,
+            author_email TEXT NOT NULL,
+            author_name TEXT,
+            comment_type TEXT DEFAULT 'note',
+            body TEXT NOT NULL,
+            email_subject TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (request_id) REFERENCES requests(id)
+        )
+    ''')
+    
+    # Create index on request_key for fast lookup
+    c.execute('CREATE INDEX IF NOT EXISTS idx_request_key ON requests(request_key)')
+    
+    conn.commit()
+    conn.close()
+    
+    # Run migrations for existing databases
+    migrate_db()
+    
+    print(f"✅ Database initialized: {get_db_path()}")
+
+
+def migrate_db():
+    """Apply schema migrations for existing databases."""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    # Migration: Add ilab_link column if it doesn't exist
+    try:
+        c.execute('ALTER TABLE requests ADD COLUMN ilab_link TEXT')
+        conn.commit()
+        print("  ↳ Migration applied: added 'ilab_link' column")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    conn.close()
+
+
+def generate_request_key():
+    """Generate the next request key (ACCT-0001 format)."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT MAX(id) FROM requests')
+    result = c.fetchone()[0]
+    conn.close()
+    
+    next_num = (result or 0) + 1
+    return f"ACCT-{next_num:04d}"
+
+
+def create_request(requester_email, requester_name=None, organization=None, 
+                   original_subject=None, original_body=None, source_email_id=None,
+                   conversation_id=None, request_type='Account Request', ilab_link=None):
+    """
+    Create a new account request.
+    Returns the request dict with generated key.
+    """
+    request_key = generate_request_key()
+    now = datetime.now().isoformat()
+    
+    conn = get_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT INTO requests (
+            request_key, requester_email, requester_name, organization,
+            request_type, original_subject, original_body, source_email_id,
+            conversation_id, ilab_link, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (request_key, requester_email.lower().strip(), requester_name, organization,
+          request_type, original_subject, original_body, source_email_id, conversation_id,
+          ilab_link, now, now))
+    
+    request_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return {
+        'id': request_id,
+        'request_key': request_key,
+        'status': 'Open',
+        'requester_email': requester_email,
+        'requester_name': requester_name,
+        'organization': organization,
+        'request_type': request_type,
+        'original_subject': original_subject,
+        'original_body': original_body,
+        'conversation_id': conversation_id,
+        'ilab_link': ilab_link,
+        'created_at': now
+    }
+
+
+def get_request_by_conversation_id(conversation_id):
+    """Get a request by its Outlook conversation ID."""
+    if not conversation_id:
+        return None
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT * FROM requests WHERE conversation_id = ? ORDER BY created_at ASC LIMIT 1', (conversation_id,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_request_by_key(request_key):
+    """Get a request by its key (e.g., ACCT-0001)."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT * FROM requests WHERE request_key = ?', (request_key.upper().strip(),))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_all_requests(status_filter=None, search_query=None):
+    """
+    Get all requests, optionally filtered by status and/or search query.
+    Returns newest first.
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    
+    query = 'SELECT * FROM requests WHERE 1=1'
+    params = []
+    
+    if status_filter and status_filter != 'All':
+        query += ' AND status = ?'
+        params.append(status_filter)
+    
+    if search_query:
+        query += ' AND (requester_email LIKE ? OR requester_name LIKE ? OR request_key LIKE ?)'
+        search_pattern = f'%{search_query}%'
+        params.extend([search_pattern, search_pattern, search_pattern])
+    
+    query += ' ORDER BY created_at DESC'
+    
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def update_request_status(request_key, new_status, updated_by=None):
+    """
+    Update the status of a request.
+    Valid statuses: 'Open', 'In Progress', 'Closed'
+    """
+    valid_statuses = ['Open', 'In Progress', 'Closed']
+    if new_status not in valid_statuses:
+        return False
+    
+    now = datetime.now().isoformat()
+    conn = get_connection()
+    c = conn.cursor()
+    
+    if new_status == 'Closed':
+        c.execute('''
+            UPDATE requests 
+            SET status = ?, updated_at = ?, closed_at = ?
+            WHERE request_key = ?
+        ''', (new_status, now, now, request_key))
+    else:
+        c.execute('''
+            UPDATE requests 
+            SET status = ?, updated_at = ?, closed_at = NULL
+            WHERE request_key = ?
+        ''', (new_status, now, request_key))
+    
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def assign_request(request_key, assignee_email):
+    """Assign a request to a staff member."""
+    now = datetime.now().isoformat()
+    conn = get_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        UPDATE requests 
+        SET assigned_to = ?, updated_at = ?
+        WHERE request_key = ?
+    ''', (assignee_email.lower().strip() if assignee_email else None, now, request_key))
+    
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def add_comment(request_key, author_email, body, author_name=None, 
+                comment_type='note', email_subject=None):
+    """
+    Add a comment/note to a request.
+    comment_type: 'note', 'email_sent', 'email_received'
+    """
+    # First get the request ID
+    request = get_request_by_key(request_key)
+    if not request:
+        return None
+    
+    now = datetime.now().isoformat()
+    conn = get_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT INTO request_comments (
+            request_id, author_email, author_name, comment_type,
+            body, email_subject, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (request['id'], author_email.lower().strip(), author_name, 
+          comment_type, body, email_subject, now))
+    
+    comment_id = c.lastrowid
+    
+    # Also update request's updated_at
+    c.execute('UPDATE requests SET updated_at = ? WHERE id = ?', (now, request['id']))
+    
+    conn.commit()
+    conn.close()
+    
+    return {
+        'id': comment_id,
+        'request_id': request['id'],
+        'author_email': author_email,
+        'author_name': author_name,
+        'comment_type': comment_type,
+        'body': body,
+        'email_subject': email_subject,
+        'created_at': now
+    }
+
+
+def get_comments_for_request(request_key):
+    """Get all comments for a request, ordered by created_at."""
+    request = get_request_by_key(request_key)
+    if not request:
+        return []
+    
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('''
+        SELECT * FROM request_comments 
+        WHERE request_id = ?
+        ORDER BY created_at ASC
+    ''', (request['id'],))
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_request_counts():
+    """Get counts by status for dashboard display."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('''
+        SELECT status, COUNT(*) as count 
+        FROM requests 
+        GROUP BY status
+    ''')
+    rows = c.fetchall()
+    conn.close()
+    
+    counts = {'Open': 0, 'In Progress': 0, 'Closed': 0, 'Total': 0}
+    for row in rows:
+        counts[row['status']] = row['count']
+        counts['Total'] += row['count']
+    
+    return counts
+
+
+# Staff management
+STAFF_USERS = [
+    {'email': 'nadia.clark@agilent.com', 'name': 'Nadia Clark'},
+    {'email': 'william.lai@agilent.com', 'name': 'William Lai'},
+    {'email': 'elvira.carrera@agilent.com', 'name': 'Elvira Carrera'},
+]
+
+
+def get_staff_users():
+    """Return list of authorized staff users."""
+    return STAFF_USERS
+
+
+def is_staff_user(email):
+    """Check if an email belongs to staff."""
+    if not email:
+        return False
+    email_lower = email.lower().strip()
+    return any(s['email'].lower() == email_lower for s in STAFF_USERS)
+
+
+def get_staff_name(email):
+    """Get staff member's name by email."""
+    if not email:
+        return None
+    email_lower = email.lower().strip()
+    for s in STAFF_USERS:
+        if s['email'].lower() == email_lower:
+            return s['name']
+    return None

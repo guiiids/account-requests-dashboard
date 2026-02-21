@@ -1,0 +1,805 @@
+{# Partial template for request detail content - Refactored to match ticket_detail4.html #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start p-6 bg-surface-50 min-h-screen">
+
+    <!-- LEFT COLUMN: Activity Stream (8 cols) -->
+    <main class="lg:col-span-8 flex flex-col min-h-[calc(100vh-160px)]">
+
+        <!-- Activity Header with Collapsible Filter -->
+        <div class="pb-4 border-b border-surface-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded-lg bg-agilent-light flex items-center justify-center">
+                        <i class="ph-bold ph-chats-circle text-agilent-blue text-lg"></i>
+                    </div>
+                    <h2 class="text-lg font-condensed font-bold text-surface-700 uppercase tracking-wide">Activity
+                        Stream</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span
+                        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-surface-600 bg-surface-100 border border-surface-200">
+                        {{ comments|length }} Messages
+                    </span>
+                    <button onclick="toggleActivityFilters()" id="filter-toggle-btn"
+                        class="h-8 w-8 rounded-lg border border-surface-200 bg-white hover:bg-surface-50 flex items-center justify-center text-surface-500 hover:text-agilent-blue transition-all duration-200"
+                        title="Filter activities">
+                        <i class="ph-bold ph-funnel text-sm"></i>
+                    </button>
+                    <button onclick="toggleHistoryView()" id="history-toggle-btn"
+                        class="h-8 w-8 rounded-lg border border-surface-200 bg-white hover:bg-surface-50 flex items-center justify-center text-surface-500 hover:text-agilent-blue transition-all duration-200"
+                        title="Audit log view">
+                        <i class="ph-bold ph-clock-counter-clockwise text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Collapsible Filter Row -->
+            <div id="activity-filters" class="flex gap-2 mt-3 overflow-hidden transition-all duration-300"
+                style="max-height: 0; opacity: 0;" role="tablist">
+                <button onclick="switchActivityTab('all')" id="tab-all"
+                    class="activity-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 bg-agilent-blue text-white"
+                    role="tab" aria-selected="true">
+                    All
+                </button>
+                <button onclick="switchActivityTab('system')" id="tab-system"
+                    class="activity-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 text-surface-600 bg-surface-100 hover:bg-surface-200"
+                    role="tab" aria-selected="false">
+                    <i class="ph-bold ph-gear"></i> System
+                </button>
+                <button onclick="switchActivityTab('agent')" id="tab-agent"
+                    class="activity-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 text-surface-600 bg-surface-100 hover:bg-surface-200"
+                    role="tab" aria-selected="false">
+                    <i class="ph-bold ph-headset"></i> Agent
+                </button>
+                <button onclick="switchActivityTab('customer')" id="tab-customer"
+                    class="activity-tab px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 text-surface-600 bg-surface-100 hover:bg-surface-200"
+                    role="tab" aria-selected="false">
+                    <i class="ph-bold ph-user"></i> Customer
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages Container (Card View) -->
+        <div id="card-view" class="flex-1 space-y-6 overflow-y-auto pr-1 pb-6 mt-6">
+            {% if comments %}
+            {% for comment in comments|reverse %}
+            {% set is_requester = (comment.author_email == request.requester_email) %}
+            {% set is_system = (comment.author_name == 'System' or comment.author_email == 'system@ilab') %}
+            {% set is_agent = (not is_requester and not is_system) %}
+
+            {% if comment.comment_type != 'activity_log' %}
+            <!-- Message Card with data attributes for filtering -->
+            <div class="activity-message bg-white rounded-xl border border-surface-200 shadow-card hover:shadow-card-hover overflow-hidden transition-all duration-200"
+                data-activity-type="{{ 'system' if is_system else ('agent' if is_agent else 'customer') }}">
+
+                <!-- Card Header -->
+                <div
+                    class="px-5 py-4 bg-gradient-to-r {{ 'from-agilent-light/50' if is_agent else ('from-gray-50' if is_system else 'from-surface-50/80') }} to-white border-b border-surface-100">
+                    <div class="flex items-center gap-4">
+                        <!-- Avatar -->
+                        {% if is_agent %}
+                        <div class="relative">
+                            <div
+                                class="h-11 w-11 rounded-full bg-gradient-to-br from-agilent-blue to-agilent-dark flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
+                                {{ comment.author_name|get_initials }}
+                            </div>
+                            <div class="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-agilent-blue border-2 border-white flex items-center justify-center"
+                                title="Support Agent">
+                                <i class="ph-bold ph-check text-white text-[8px]"></i>
+                            </div>
+                        </div>
+                        {% elif is_system %}
+                        <div
+                            class="h-11 w-11 rounded-full bg-surface-100 flex items-center justify-center text-surface-500 font-bold text-xs ring-2 ring-white">
+                            SYS
+                        </div>
+                        {% else %}
+                        <div
+                            class="h-11 w-11 rounded-full bg-gradient-to-br from-surface-300 to-surface-400 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
+                            {{ comment.author_name|get_initials }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Name and Role -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="font-bold text-surface-800 truncate text-base">
+                                    {{ comment.author_name or comment.author_email }}
+                                </span>
+                                {% if is_agent %}
+                                <span
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-br from-agilent-blue to-agilent-dark text-white shadow-sm">
+                                    <i class="ph-bold ph-headset"></i> Support Agent
+                                </span>
+                                {% elif is_system %}
+                                <span
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                    <i class="ph-bold ph-gear"></i> System
+                                </span>
+                                {% else %}
+                                <span
+                                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border border-surface-300 text-surface-600">
+                                    Requester
+                                </span>
+                                {% endif %}
+                            </div>
+                            <time class="text-xs text-surface-500 font-medium mt-0.5 block flex items-center gap-1">
+                                <i class="ph-regular ph-clock"></i> {{ comment.created_at|format_datetime }}
+                            </time>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Body -->
+                <div class="px-5 py-5">
+                    {% if comment.email_subject %}
+                    <div class="text-sm font-medium mb-3 text-surface-800 border-b border-surface-100 pb-2">
+                        {{ comment.email_subject }}
+                    </div>
+                    {% endif %}
+                    <div class="text-md text-surface-700 whitespace-pre-wrap leading-relaxed">{{ comment.body }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% else %}
+            <div class="text-center py-16 bg-white rounded-xl border-2 border-dashed border-surface-200">
+                <div class="h-14 w-14 mx-auto rounded-full bg-surface-100 flex items-center justify-center mb-4">
+                    <i class="ph-duotone ph-chats-teardrop text-3xl text-surface-300"></i>
+                </div>
+                <p class="text-surface-600 font-semibold">No activity recorded</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Audit Log View (Hidden by default) -->
+        <div id="history-view" class="flex-1 overflow-y-auto pr-1 pb-6 mt-6" style="display: none;">
+            {% if comments %}
+            <div class="bg-white rounded-xl border border-surface-200 overflow-hidden">
+                <div class="px-4 py-2.5 bg-surface-50 border-b border-surface-200 flex items-center gap-2">
+                    <i class="ph-bold ph-clock-counter-clockwise text-surface-400 text-sm"></i>
+                    <span class="text-xs font-bold text-surface-500 uppercase tracking-wider">Change History</span>
+                </div>
+                <div class="divide-y divide-surface-100 font-mono text-xs">
+                    {% for comment in comments|reverse %}
+                    {% set is_requester = (comment.author_email == request.requester_email) %}
+                    {% set is_system = (comment.author_name == 'System' or comment.author_email == 'system@ilab') %}
+                    {% set is_agent = (not is_requester and not is_system) %}
+                    <div class="px-4 py-2 hover:bg-surface-50/50 flex items-start gap-3 transition-colors">
+                        <span class="text-surface-400 whitespace-nowrap flex-shrink-0">{{
+                            comment.created_at|format_datetime }}</span>
+                        <span class="w-px self-stretch bg-surface-200 flex-shrink-0"></span>
+                        <span class="font-semibold text-surface-600 whitespace-nowrap flex-shrink-0">{{
+                            comment.author_name or comment.author_email }}</span>
+                        <span class="text-surface-400 flex-shrink-0">&mdash;</span>
+                        <span class="text-surface-700 break-words">{{ comment.body|truncate(120) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-16 bg-white rounded-xl border-2 border-dashed border-surface-200">
+                <p class="text-surface-600 font-semibold">No history</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Original Request -->
+        <div class="bg-surface-50 rounded-xl border border-surface-200 p-4 opacity-75">
+            <div class="flex items-center gap-2 mb-2 text-xs font-bold text-surface-400 uppercase tracking-widest">
+                <i class="ph-bold ph-arrow-u-down-left"></i> Original Request
+            </div>
+            <div class="text-sm font-mono text-surface-600 bg-white p-3 rounded border border-surface-200 whitespace-pre-wrap">{{ request.original_body|format_email_body|trim }}</div>
+        </div>
+
+        <!-- Inline Composer (Sticky Bottom) -->
+        <div class="sticky bottom-0 bg-surface-50 border-t border-surface-200 mt-6 pb-4 pt-4">
+            <div
+                class="bg-white rounded-xl border border-surface-200 p-3 flex gap-3 items-center focus-within:ring-2 focus-within:ring-agilent-blue/20 focus-within:border-agilent-blue transition-all shadow-sm">
+                <textarea id="note-body-{{ request.request_key }}"
+                    class="w-full bg-transparent border-none text-sm text-surface-800 placeholder-surface-400 focus:ring-0 resize-none py-3 px-4 h-14 min-h-[56px] max-h-32"
+                    placeholder="Type a new internal note..."></textarea>
+                <button onclick="RequestActions.submitNote('{{ request.request_key }}')"
+                    class="flex-shrink-0 h-11 w-11 rounded-xl bg-gradient-to-br from-agilent-blue to-agilent-dark text-white hover:from-agilent-dark hover:to-agilent-dark shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center"
+                    title="Send Note">
+                    <i class="ph-bold ph-paper-plane-right text-lg"></i>
+                </button>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-xs text-surface-400 px-1">
+                <span class="flex items-center gap-1.5">
+                    <i class="ph-bold ph-info text-agilent-blue"></i>
+                    Internal Note only
+                </span>
+            </div>
+        </div>
+    </main>
+
+    <!-- RIGHT COLUMN: Metadata Sidebar (4 cols) — Modern Floating Design -->
+    <style>
+        /* ── Sidebar Shell ── */
+        .detail-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* ── Glass Card ── */
+        .sidebar-glass-card {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 18px;
+            box-shadow:
+                0 4px 6px -1px rgba(0,0,0,0.05),
+                0 10px 30px -5px rgba(0,87,184,0.08),
+                0 0 0 1px rgba(0,87,184,0.04);
+            overflow: visible; /* must be visible so dropdowns aren't clipped */
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
+        .sidebar-glass-card:hover {
+            box-shadow:
+                0 8px 16px -2px rgba(0,0,0,0.08),
+                0 20px 40px -8px rgba(0,87,184,0.12),
+                0 0 0 1px rgba(0,87,184,0.06);
+            transform: translateY(-1px);
+        }
+
+        /* ── Card Header ── */
+        .sidebar-card-header {
+            padding: 1rem 1.25rem 0.875rem;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            position: relative;
+            overflow: hidden; /* clip the glow orb only within header */
+            border-radius: 17px 17px 0 0; /* match parent card radius */
+        }
+        .sidebar-card-header::before {
+            content: '';
+            position: absolute;
+            top: -30px; right: -30px;
+            width: 100px; height: 100px;
+            background: radial-gradient(circle, rgba(0,133,202,0.35) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .sidebar-key-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.5);
+        }
+        .sidebar-ticket-id {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.01em;
+            margin-top: 0.25rem;
+        }
+
+        /* ── Section Label ── */
+        .sidebar-section-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 0.875rem;
+        }
+        .sidebar-section-label i { font-size: 0.75rem; }
+
+        /* ── Divider ── */
+        .sidebar-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+            margin: 1.125rem 0;
+        }
+
+        /* ── Metadata Row ── */
+        .meta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+        }
+        .meta-label { font-size: 0.78rem; color: #94a3b8; font-weight: 500; }
+        .meta-value { font-size: 0.82rem; font-weight: 700; color: #1e293b; }
+
+        /* ── Modern Custom Dropdown ── */
+        .custom-select-wrapper {
+            position: relative;
+        }
+        .custom-select-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.6rem 0.875rem;
+            border-radius: 10px;
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #1e293b;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            user-select: none;
+        }
+        .custom-select-trigger:hover {
+            border-color: #0057b8;
+            box-shadow: 0 0 0 3px rgba(0,87,184,0.08);
+        }
+        .custom-select-trigger.open {
+            border-color: #0057b8;
+            box-shadow: 0 0 0 3px rgba(0,87,184,0.12);
+        }
+        .custom-select-chevron {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+            flex-shrink: 0;
+        }
+        .custom-select-trigger.open .custom-select-chevron {
+            transform: rotate(180deg);
+        }
+        .custom-select-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0; right: 0;
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+            z-index: 9999;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-6px) scale(0.98);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        .custom-select-dropdown.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: all;
+        }
+        .custom-select-option {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.625rem 0.875rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: #334155;
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .custom-select-option:hover { background: #f1f5f9; }
+        .custom-select-option.selected {
+            background: #eff6ff;
+            color: #0057b8;
+            font-weight: 700;
+        }
+        .custom-select-option .option-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Status dot colors */
+        .dot-open     { background: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+        .dot-progress { background: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,0.25); }
+        .dot-closed   { background: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,0.25); }
+        .dot-person   { background: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,0.25); }
+        .dot-unassigned { background: #94a3b8; }
+
+        /* ── Requester Avatar Card ── */
+        .requester-card {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 0.875rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+        }
+        .requester-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #64748b, #475569);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff;
+            font-weight: 800;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .requester-name { font-size: 0.85rem; font-weight: 700; color: #1e293b; }
+        .requester-email {
+            font-size: 0.75rem;
+            color: #0057b8;
+            text-decoration: none;
+            display: block;
+            margin-top: 1px;
+        }
+        .requester-email:hover { text-decoration: underline; }
+        .requester-org {
+            margin-top: 0.625rem;
+            padding-top: 0.625rem;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.75rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        /* ── iLab Link button ── */
+        .ilab-link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #0057b8;
+            background: #eff6ff;
+            text-decoration: none;
+            border: 1px solid #bfdbfe;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .ilab-link-btn:hover { background: #dbeafe; border-color: #93c5fd; }
+
+        /* ── Action Buttons ── */
+        .sidebar-btn-primary {
+            width: 100%;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            padding: 0.7rem 1rem;
+            border-radius: 10px;
+            font-size: 0.82rem; font-weight: 700;
+            color: #fff;
+            background: linear-gradient(135deg, #0057b8, #004494);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,87,184,0.3);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .sidebar-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0,87,184,0.4);
+        }
+        .sidebar-btn-primary:active { transform: translateY(0); }
+
+        .sidebar-btn-ghost {
+            width: 100%;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            padding: 0.65rem 1rem;
+            border-radius: 10px;
+            font-size: 0.82rem; font-weight: 600;
+            color: #475569;
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, color 0.15s;
+        }
+        .sidebar-btn-ghost:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+    </style>
+
+    <aside class="lg:col-span-4 sticky top-6 detail-sidebar">
+
+        <!-- Main Info Card -->
+        <div class="sidebar-glass-card">
+            <!-- Header -->
+            <div class="sidebar-card-header">
+                <div class="sidebar-key-tag">
+                    <i class="ph-bold ph-ticket"></i> Ticket
+                </div>
+                <div class="sidebar-ticket-id">{{ request.request_key }}</div>
+            </div>
+
+            <div style="padding: 1.25rem;">
+
+                <!-- DETAILS Section -->
+                <div class="sidebar-section-label">
+                    <i class="ph-bold ph-tag"></i> Details
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+                    <div class="meta-row">
+                        <span class="meta-label">Type</span>
+                        <span class="meta-value">{{ request.request_type or 'Account Request' }}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Created</span>
+                        <span class="meta-value">{{ request.created_at|format_datetime }}</span>
+                    </div>
+                    {% if request.ilab_link %}
+                    <div class="meta-row">
+                        <span class="meta-label">iLab</span>
+                        <a href="{{ request.ilab_link }}" target="_blank" rel="noopener noreferrer" class="ilab-link-btn">
+                            <i class="ph-bold ph-arrow-square-out"></i> Open in iLab
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- STATUS & OWNER Section -->
+                <div class="sidebar-section-label">
+                    <i class="ph-bold ph-sliders-horizontal"></i> Status & Owner
+                </div>
+
+                <!-- Custom Status Dropdown -->
+                <div style="margin-bottom: 0.75rem;">
+                    <div style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.4rem;">Status</div>
+                    <div class="custom-select-wrapper" id="status-select-wrapper-{{ request.request_key }}">
+                        <div class="custom-select-trigger" id="status-trigger-{{ request.request_key }}"
+                             onclick="toggleCustomSelect('status', '{{ request.request_key }}')">
+                            <span style="display:flex;align-items:center;gap:0.5rem;">
+                                <span class="option-dot
+                                    {% if request.status == 'Open' %}dot-open
+                                    {% elif request.status == 'In Progress' %}dot-progress
+                                    {% else %}dot-closed{% endif %}"></span>
+                                <span id="status-display-{{ request.request_key }}">{{ request.status or 'Open' }}</span>
+                            </span>
+                            <i class="ph-bold ph-caret-down custom-select-chevron"></i>
+                        </div>
+                        <div class="custom-select-dropdown" id="status-dropdown-{{ request.request_key }}">
+                            <div class="custom-select-option {% if request.status == 'Open' %}selected{% endif %}"
+                                 onclick="selectStatus('{{ request.request_key }}', 'Open')">
+                                <span class="option-dot dot-open"></span> Open
+                            </div>
+                            <div class="custom-select-option {% if request.status == 'In Progress' %}selected{% endif %}"
+                                 onclick="selectStatus('{{ request.request_key }}', 'In Progress')">
+                                <span class="option-dot dot-progress"></span> In Progress
+                            </div>
+                            <div class="custom-select-option {% if request.status == 'Closed' %}selected{% endif %}"
+                                 onclick="selectStatus('{{ request.request_key }}', 'Closed')">
+                                <span class="option-dot dot-closed"></span> Closed
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Assignee Dropdown -->
+                <div>
+                    <div style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.4rem;">Assignee</div>
+                    <div class="custom-select-wrapper" id="assignee-select-wrapper-{{ request.request_key }}">
+                        <div class="custom-select-trigger" id="assignee-trigger-{{ request.request_key }}"
+                             onclick="toggleCustomSelect('assignee', '{{ request.request_key }}')">
+                            <span style="display:flex;align-items:center;gap:0.5rem;">
+                                <span class="option-dot {% if request.assigned_to %}dot-person{% else %}dot-unassigned{% endif %}"></span>
+                                <span id="assignee-display-{{ request.request_key }}">
+                                    {% if request.assigned_to %}
+                                        {% for user in staff_users %}{% if user.email == request.assigned_to %}{{ user.name }}{% endif %}{% endfor %}
+                                    {% else %}Unassigned{% endif %}
+                                </span>
+                            </span>
+                            <i class="ph-bold ph-caret-down custom-select-chevron"></i>
+                        </div>
+                        <div class="custom-select-dropdown" id="assignee-dropdown-{{ request.request_key }}">
+                            <div class="custom-select-option {% if not request.assigned_to %}selected{% endif %}"
+                                 onclick="selectAssignee('{{ request.request_key }}', '', 'Unassigned')">
+                                <span class="option-dot dot-unassigned"></span> Unassigned
+                            </div>
+                            {% for user in staff_users %}
+                            <div class="custom-select-option {% if request.assigned_to == user.email %}selected{% endif %}"
+                                 onclick="selectAssignee('{{ request.request_key }}', '{{ user.email }}', '{{ user.name }}')">
+                                <span class="option-dot dot-person"></span> {{ user.name }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- REQUESTER Section -->
+                <div class="sidebar-section-label">
+                    <i class="ph-bold ph-user"></i> Requester
+                </div>
+                <div class="requester-card">
+                    <div class="requester-avatar">{{ request.requester_name|get_initials }}</div>
+                    <div style="min-width:0; flex:1;">
+                        <div class="requester-name">{{ request.requester_name or 'Unknown' }}</div>
+                        <a href="mailto:{{ request.requester_email }}" class="requester-email">
+                            {{ request.requester_email }}
+                        </a>
+                    </div>
+                </div>
+                {% if request.organization %}
+                <div class="requester-org">
+                    <i class="ph-bold ph-buildings"></i> {{ request.organization }}
+                </div>
+                {% endif %}
+
+                <div class="sidebar-divider"></div>
+
+                <!-- QUICK ACTIONS -->
+                <div style="display:flex; flex-direction:column; gap:0.625rem;">
+                    <button onclick="RequestActions.openModal('email-modal-{{ request.request_key }}')"
+                        class="sidebar-btn-primary">
+                        <i class="ph-bold ph-envelope"></i> Reply via Email
+                    </button>
+                    {% if request.status != 'Closed' %}
+                    <button onclick="RequestActions.updateStatus('{{ request.request_key }}', 'Closed')"
+                        class="sidebar-btn-ghost">
+                        <i class="ph-bold ph-check-circle"></i> Close Ticket
+                    </button>
+                    {% else %}
+                    <button onclick="RequestActions.updateStatus('{{ request.request_key }}', 'Open')"
+                        class="sidebar-btn-ghost">
+                        <i class="ph-bold ph-arrow-counter-clockwise"></i> Reopen Ticket
+                    </button>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+    </aside>
+
+    <script>
+    /* ── Custom Dropdown Logic ── */
+    function toggleCustomSelect(type, key) {
+        const trigger = document.getElementById(type + '-trigger-' + key);
+        const dropdown = document.getElementById(type + '-dropdown-' + key);
+        const isOpen = dropdown.classList.contains('open');
+
+        // Close all open dropdowns first
+        document.querySelectorAll('.custom-select-dropdown').forEach(d => d.classList.remove('open'));
+        document.querySelectorAll('.custom-select-trigger').forEach(t => t.classList.remove('open'));
+
+        if (!isOpen) {
+            dropdown.classList.add('open');
+            trigger.classList.add('open');
+        }
+    }
+
+    function selectStatus(key, value) {
+        // Update display
+        const dotMap = { 'Open': 'dot-open', 'In Progress': 'dot-progress', 'Closed': 'dot-closed' };
+        const triggerContent = document.querySelector('#status-trigger-' + key + ' span span:first-child');
+        if (triggerContent) {
+            triggerContent.className = 'option-dot ' + (dotMap[value] || 'dot-open');
+        }
+        document.getElementById('status-display-' + key).textContent = value;
+
+        // Mark selected
+        document.querySelectorAll('#status-dropdown-' + key + ' .custom-select-option').forEach(opt => {
+            opt.classList.toggle('selected', opt.textContent.trim() === value);
+        });
+
+        // Close
+        document.getElementById('status-dropdown-' + key).classList.remove('open');
+        document.getElementById('status-trigger-' + key).classList.remove('open');
+
+        // Call existing action
+        RequestActions.updateStatus(key, value);
+    }
+
+    function selectAssignee(key, email, name) {
+        const triggerDot = document.querySelector('#assignee-trigger-' + key + ' span span:first-child');
+        if (triggerDot) {
+            triggerDot.className = 'option-dot ' + (email ? 'dot-person' : 'dot-unassigned');
+        }
+        document.getElementById('assignee-display-' + key).textContent = name;
+
+        document.querySelectorAll('#assignee-dropdown-' + key + ' .custom-select-option').forEach(opt => {
+            opt.classList.toggle('selected', opt.textContent.trim() === name);
+        });
+
+        document.getElementById('assignee-dropdown-' + key).classList.remove('open');
+        document.getElementById('assignee-trigger-' + key).classList.remove('open');
+
+        RequestActions.assignRequest(key, email);
+    }
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.custom-select-wrapper')) {
+            document.querySelectorAll('.custom-select-dropdown').forEach(d => d.classList.remove('open'));
+            document.querySelectorAll('.custom-select-trigger').forEach(t => t.classList.remove('open'));
+        }
+    });
+    </script>
+</div>
+
+<!-- Copy existing Modals exactly as they were, just kept at bottom -->
+<!-- Modals (Note & Email) -->
+<!-- Note Modal (Used for fallback or explicit button) -->
+<div class="modal-overlay" id="note-modal-{{ request.request_key }}">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="card-title">Add Internal Note</h3>
+            <button class="btn btn-secondary btn-sm"
+                onclick="RequestActions.closeModal('note-modal-{{ request.request_key }}')"><i
+                    class="ph ph-x"></i></button>
+        </div>
+        <div class="modal-body">
+            <!-- Ensure ID matches script expectation -->
+            <!-- We used note-body-{key} in inline composer. 
+                  If we have both, IDs typically conflict. 
+                  Since we moved to inline composer, we don't need this modal anymore 
+                  UNLESS the inline one is for notes too.
+                  
+                  Wait, RequestActions.submitNote uses inputId = `note-body-${requestKey}`.
+                  The inline composer uses this ID.
+                  So we should REMOVE this modal to specific ID conflict, or rename the modal input properly if we intend to keep it.
+                  Given the design shift, inline is the way. Removing Note Modal from HTML, but keeping structure if needed. 
+                  Users can reply via bottom composer.
+            -->
+            <!-- Removing Note Modal to avoid ID conflict with inline composer -->
+        </div>
+        <!-- ... -->
+    </div>
+</div>
+
+<!-- Email Modal - Still Needed -->
+<div class="modal-overlay fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+    id="email-modal-{{ request.request_key }}">
+    <!-- Tailwind Modal styling adaptation -->
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col m-4">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-surface-200">
+            <h3 class="text-lg font-bold text-surface-800">Compose Email</h3>
+            <button onclick="RequestActions.closeModal('email-modal-{{ request.request_key }}')"
+                class="p-2 hover:bg-surface-100 rounded-lg text-surface-500">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto space-y-4">
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase text-surface-500 tracking-wide">Recipients</label>
+                <div id="recipient-list-{{ request.request_key }}" class="flex flex-wrap gap-2 mb-2"></div>
+                <div class="flex gap-2">
+                    <input type="email" id="new-recipient-{{ request.request_key }}"
+                        class="flex-1 rounded-lg border border-surface-300 text-sm focus:border-agilent-blue focus:ring focus:ring-agilent-blue/20"
+                        placeholder="Add email address..."
+                        onkeydown="RequestActions.handleRecipientEnter(event, '{{ request.request_key }}')">
+                    <button onclick="RequestActions.addRecipientManual('{{ request.request_key }}')"
+                        class="px-4 py-2 bg-surface-100 hover:bg-surface-200 text-surface-700 font-bold rounded-lg text-sm">Add</button>
+                </div>
+                <div class="mt-2">
+                    <span class="text-xs text-surface-500">Suggested: </span>
+                    <button
+                        class="text-xs bg-agilent-light text-agilent-dark px-2 py-1 rounded font-medium hover:bg-blue-100"
+                        onclick="RequestActions.addRecipient('{{ request.request_key }}', '{{ request.requester_email }}')">
+                        {{ request.requester_email }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase text-surface-500 tracking-wide">Subject</label>
+                <input type="text" id="email-subject-{{ request.request_key }}"
+                    class="w-full rounded-lg border border-surface-300 text-sm focus:border-agilent-blue focus:ring focus:ring-agilent-blue/20 font-medium"
+                    value="Re: Account Request {{ request.request_key }}">
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-xs font-bold uppercase text-surface-500 tracking-wide">Message</label>
+                <textarea id="email-body-{{ request.request_key }}"
+                    class="w-full rounded-lg border border-surface-300 text-sm focus:border-agilent-blue focus:ring focus:ring-agilent-blue/20 min-h-[200px]"
+                    placeholder="Type your email..."></textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-surface-200 flex justify-end gap-3 rounded-b-xl">
+            <button onclick="RequestActions.closeModal('email-modal-{{ request.request_key }}')"
+                class="px-4 py-2 bg-white border border-surface-300 text-surface-700 font-bold rounded-lg text-sm hover:bg-surface-50">Discard</button>
+            <button id="send-email-btn-{{ request.request_key }}"
+                onclick="RequestActions.sendEmail('{{ request.request_key }}')"
+                class="px-4 py-2 bg-agilent-blue hover:bg-agilent-dark text-white font-bold rounded-lg text-sm shadow-md flex items-center gap-2">
+                <i class="ph-bold ph-paper-plane-right"></i> Send Email
+            </button>
+        </div>
+    </div>
+</div>

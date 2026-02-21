@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Request {{ request.request_key }}{% endblock %}
+{% block page_title %}Request Details{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('dashboard') }}" class="text-gray-500 hover:text-agilent-blue transition-colors"
+        style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem;">
+        <i class="ph ph-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<!-- Load the refactored partial content -->
+{% include 'partials/request_detail_content.html' %}
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include RequestActions for interactivity -->
+<script src="{{ url_for('static', filename='js/request_actions.js') }}"></script>
+{% endblock %}

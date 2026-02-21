@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Tab Bar -->
+<div id="tab-bar" class="tab-bar">
+    <div class="tab-list" id="tab-list">
+        <!-- Home tab (always present) -->
+        <div class="tab active" data-tab-id="home" onclick="TabManager.switchTab('home')">
+            <i class="ph ph-house"></i>
+            <span>Dashboard</span>
+        </div>
+        <!-- Dynamic request tabs will be added here by JavaScript -->
+    </div>
+</div>
+
+<!-- Tab Content Container -->
+<div id="tab-content-container">
+    <!-- Home tab content (existing dashboard content) -->
+    <div id="tab-content-home" class="tab-content active">
+
+        <!-- Insight Grid (Modern Stats) -->
+        <div class="stats-grid mb-4">
+            <!-- Total -->
+            <div class="stat-card {% if current_filter == 'All' %}active{% endif %}" onclick="filterByStatus('All')">
+                <div class="stat-icon-wrapper bg-blue-light text-blue">
+                    <i class="ph ph-files"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">{{ counts.Total }}</div>
+                    <div class="stat-label">Total Requests</div>
+                    <div class="stat-trend neutral">All time</div>
+                </div>
+            </div>
+
+            <!-- Open -->
+            <div class="stat-card {% if current_filter == 'Open' %}active{% endif %}" onclick="filterByStatus('Open')">
+                <div class="stat-icon-wrapper bg-indigo-light text-indigo">
+                    <i class="ph ph-envelope-open"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value text-indigo">{{ counts.Open }}</div>
+                    <div class="stat-label">Open</div>
+                    <div class="stat-trend">Needs Action</div>
+                </div>
+            </div>
+
+            <!-- In Progress -->
+            <div class="stat-card {% if current_filter == 'In Progress' %}active{% endif %}"
+                onclick="filterByStatus('In Progress')">
+                <div class="stat-icon-wrapper bg-amber-light text-amber">
+                    <i class="ph ph-clock-clockwise"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value text-amber">{{ counts['In Progress'] }}</div>
+                    <div class="stat-label">In Progress</div>
+                    <div class="stat-trend">Processing</div>
+                </div>
+            </div>
+
+            <!-- Closed -->
+            <div class="stat-card {% if current_filter == 'Closed' %}active{% endif %}"
+                onclick="filterByStatus('Closed')">
+                <div class="stat-icon-wrapper bg-emerald-light text-emerald">
+                    <i class="ph ph-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value text-emerald">{{ counts.Closed }}</div>
+                    <div class="stat-label">Closed</div>
+                    <div class="stat-trend good">Completed</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Section: Requests List -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ph ph-list-dashes"></i>
+                    <span>All Requests</span>
+                    {% if current_filter != 'All' %}
+                    <span class="badge"
+                        style="background: var(--surface-100); color: var(--text-secondary); margin-left: 0.5rem;">
+                        {{ current_filter }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="header-actions" style="display: flex; gap: 1rem;">
+                    <!-- Actions -->
+                    <form class="search-global" method="GET" action="{{ url_for('dashboard') }}">
+                        <input type="hidden" name="status" value="{{ current_filter }}">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <input type="text" name="search" placeholder="Search requests..." value="{{ search_query }}">
+                    </form>
+
+                    <a href="{{ url_for('import_request') }}" class="btn btn-primary">
+                        <i class="ph ph-plus"></i>
+                        <span>New Request</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="table-container">
+                {% if requests %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Reference</th>
+                            <th>Requester</th>
+                            <th>Status</th>
+                            <th>Owner</th>
+                            <th>Date</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                        <tr data-request-key="{{ req.request_key }}" style="cursor: pointer;">
+                            <td>
+                                <span class="ref-code">{{ req.request_key }}</span>
+                            </td>
+                            <td>
+                                <div class="user-cell">
+                                    <div class="user-avatar-sm">{{ req.requester_name[:1].upper() if req.requester_name
+                                        else '?'
+                                        }}</div>
+                                    <div class="user-text">
+                                        <div class="user-name">{{ req.requester_name or 'Unknown' }}</div>
+                                        <div class="user-sub">
+                                            {{ req.requester_email }}
+                                            {% if req.organization %}
+                                            <span style="margin-left: 0.5rem; font-weight: 500;">
+                                                {{ req.organization }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ req.status|lower|replace(' ', '-') }}">
+                                    <span class="badge-dot"></span>
+                                    {{ req.status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if req.assigned_to %}
+                                <div class="assigned-chip">
+                                    {{ req.assigned_to.split('@')[0] }}
+                                </div>
+                                {% else %}
+                                <span class="text-muted text-sm">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-secondary text-sm">
+                                {{ req.created_at|format_datetime }}
+                            </td>
+                            <td class="text-right">
+                                <i class="ph ph-caret-right text-muted"></i>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="ph ph-files"></i>
+                    </div>
+                    <h3>No requests found</h3>
+                    <p>Try adjusting your search or filters.</p>
+                    {% if search_query %}
+                    <a href="{{ url_for('dashboard', status=current_filter) }}" class="btn btn-secondary mt-4">
+                        Clear Filters
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+    <!-- Dynamic tab contents will be added here by JavaScript -->
+</div>
+
+<script>
+    function filterByStatus(status) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('status', status);
+        url.hash = ''; // Clear hash when filtering
+        window.location.href = url.toString();
+    }
+
+    // Tab Manager
+    const TabManager = {
+        tabs: new Map(),
+        activeTab: 'home',
+
+        init() {
+            // Check URL hash for initial tab to open
+            const hash = window.location.hash;
+            if (hash.startsWith('#tab=')) {
+                const requestKey = hash.substring(5);
+                this.openTab(requestKey);
+            }
+
+            // Listen for hash changes
+            window.addEventListener('hashchange', () => {
+                const hash = window.location.hash;
+                if (hash.startsWith('#tab=')) {
+                    const requestKey = hash.substring(5);
+                    if (!this.tabs.has(requestKey)) {
+                        this.openTab(requestKey);
+                    } else {
+                        this.switchTab(requestKey);
+                    }
+                } else if (hash === '' || hash === '#') {
+                    this.switchTab('home');
+                }
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Cmd/Ctrl + W to close active tab
+                if ((e.metaKey || e.ctrlKey) && e.key === 'w' && this.activeTab !== 'home') {
+                    e.preventDefault();
+                    this.closeTab(this.activeTab);
+                }
+            });
+        },
+
+        async openTab(requestKey) {
+            // Check if tab already exists
+            if (this.tabs.has(requestKey)) {
+                this.switchTab(requestKey);
+                return;
+            }
+
+            // Create tab element
+            this.createTabElement(requestKey);
+
+            // Load tab content
+            await this.loadTabContent(requestKey);
+
+            // Switch to the new tab
+            this.switchTab(requestKey);
+
+            // Update URL hash
+            window.location.hash = `tab=${requestKey}`;
+        },
+
+        createTabElement(requestKey) {
+            const tabList = document.getElementById('tab-list');
+            const tabEl = document.createElement('div');
+            tabEl.className = 'tab';
+            tabEl.dataset.tabId = requestKey;
+            tabEl.innerHTML = `
+                <i class="ph ph-file-text"></i>
+                <span>${requestKey}</span>
+                <i class="ph ph-x tab-close" onclick="event.stopPropagation(); TabManager.closeTab('${requestKey}')"></i>
+            `;
+            tabEl.onclick = () => this.switchTab(requestKey);
+            tabList.appendChild(tabEl);
+
+            // Create content container
+            const contentContainer = document.getElementById('tab-content-container');
+            const contentEl = document.createElement('div');
+            contentEl.id = `tab-content-${requestKey}`;
+            contentEl.className = 'tab-content';
+            contentEl.innerHTML = '<div class="loading-state"><i class="ph ph-spinner ph-spin"></i> Loading...</div>';
+            contentContainer.appendChild(contentEl);
+
+            this.tabs.set(requestKey, { tabEl, contentEl });
+        },
+
+        async loadTabContent(requestKey) {
+            const tab = this.tabs.get(requestKey);
+            if (!tab) return;
+
+            try {
+                const response = await fetch(`/other/api/request/${requestKey}/detail`);
+                if (!response.ok) throw new Error('Failed to load request');
+
+                const html = await response.text();
+                tab.contentEl.innerHTML = html;
+            } catch (error) {
+                tab.contentEl.innerHTML = `
+                    <div class="empty-state">
+                        <i class="ph ph-warning-circle empty-icon"></i>
+                        <h3>Failed to load request</h3>
+                        <p>${error.message}</p>
+                        <button class="btn btn-secondary mt-4" onclick="TabManager.reloadTab('${requestKey}')">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        },
+
+        async reloadTab(requestKey) {
+            // Reload the current tab's content
+            await this.loadTabContent(requestKey);
+        },
+
+        switchTab(tabId) {
+            // Update active tab
+            this.activeTab = tabId;
+
+            // Update tab elements
+            document.querySelectorAll('.tab').forEach(tab => {
+                if (tab.dataset.tabId === tabId) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+
+            // Update content elements
+            document.querySelectorAll('.tab-content').forEach(content => {
+                const contentTabId = content.id.replace('tab-content-', '');
+                if (contentTabId === tabId) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+
+            // Update URL hash
+            if (tabId === 'home') {
+                window.history.pushState(null, '', window.location.pathname + window.location.search);
+            } else {
+                window.history.pushState(null, '', `#tab=${tabId}`);
+            }
+        },
+
+        closeTab(tabId) {
+            if (tabId === 'home') return; // Can't close home tab
+
+            const tab = this.tabs.get(tabId);
+            if (!tab) return;
+
+            // Remove elements
+            tab.tabEl.remove();
+            tab.contentEl.remove();
+
+            // Remove from map
+            this.tabs.delete(tabId);
+
+            // Switch to home tab if this was the active tab
+            if (this.activeTab === tabId) {
+                this.switchTab('home');
+            }
+        }
+    };
+
+    // Initialize tab manager on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        TabManager.init();
+    });
+
+    // Modify table row clicks to open tabs instead of navigating
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-request-key]').forEach(row => {
+            row.addEventListener('click', (e) => {
+                e.preventDefault();
+                const requestKey = row.dataset.requestKey;
+                TabManager.openTab(requestKey);
+            });
+        });
+    });
+</script>
+<script src="{{ url_for('static', filename='js/request_actions.js') }}"></script>
+{% endblock %}

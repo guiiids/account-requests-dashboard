@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Overview{% endblock %} | iLab Accounts</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons (Phosphor is cleaner/modern standard) -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+
+    <!-- App Design System -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        agilent: {
+                            blue: '#0085D5',
+                            dark: '#0B3F63',
+                            light: '#E6F3FA'
+                        },
+                        surface: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    {% if current_user %}
+    <div class="app-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand-wrapper">
+                    <!-- Agilent/iLab Brand Placeholder -->
+                    <i class="ph-fill ph-flask brand-icon"></i>
+                    <span>iLab Control</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('dashboard') }}"
+                    class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <i class="ph ph-squares-four"></i>
+                    <span>Overview</span>
+                </a>
+                <a href="{{ url_for('import_request') }}"
+                    class="nav-item {% if request.endpoint == 'import_request' %}active{% endif %}">
+                    <i class="ph ph-file-arrow-up"></i>
+                    <span>Import Data</span>
+                </a>
+
+                <!-- Mock-up items for 'Evolved' feel -->
+                <a href="#" class="nav-item disabled" style="opacity: 0.5;">
+                    <i class="ph ph-users"></i>
+                    <span>Users</span>
+                </a>
+                <a href="#" class="nav-item disabled" style="opacity: 0.5;">
+                    <i class="ph ph-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-snippet">
+                    <div class="avatar-circle">
+                        {{ current_user.name[:1].upper() }}
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name">{{ current_user.name }}</span>
+                        <span class="user-role">Administrator</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="logout-btn" title="Sign Out">
+                        <i class="ph ph-sign-out"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- Top Sticky Header -->
+            <header class="top-header">
+                <div class="page-title">{% block page_title %}Dashboard{% endblock %}</div>
+                <div class="header-actions">
+                    <!-- Global Search could go here -->
+                </div>
+            </header>
+
+            <div class="page-container">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% else %}
+    <!-- No Sidebar for Login Page -->
+    <main class="auth-layout">
+        {% block auth_content %}{% endblock %}
+    </main>
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>
