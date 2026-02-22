@@ -4,10 +4,11 @@ A staff-only dashboard for managing iLab account signup requests.
 """
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 import database
+import audit
 import email_parser
 import notification_util
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
 
@@ -18,6 +19,37 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'account-requests-dev-secret-2026')
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+
+
+# =============================================================================
+# Brute-Force Rate Limiting (in-memory)
+# =============================================================================
+
+_LOGIN_ATTEMPTS = {}  # {email: [datetime, ...]}
+_MAX_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 15
+
+
+def _is_login_locked(email):
+    """Check if email is temporarily locked due to failed attempts."""
+    attempts = _LOGIN_ATTEMPTS.get(email, [])
+    cutoff = datetime.now() - timedelta(minutes=_LOCKOUT_MINUTES)
+    recent = [t for t in attempts if t > cutoff]
+    _LOGIN_ATTEMPTS[email] = recent
+    return len(recent) >= _MAX_ATTEMPTS
+
+
+def _record_failed_attempt(email):
+    """Record a failed login attempt."""
+    _LOGIN_ATTEMPTS.setdefault(email, []).append(datetime.now())
+
+
+def _clear_login_attempts(email):
+    """Clear attempts after successful login."""
+    _LOGIN_ATTEMPTS.pop(email, None)
 
 
 # =============================================================================
@@ -129,24 +161,57 @@ def index():
 
 @app.route('/other/login', methods=['GET', 'POST'])
 def login():
-    """Staff login page."""
+    """Staff login page with email + password."""
     error = None
-    
+
     if request.method == 'POST':
         email = request.form.get('email', '').lower().strip()
-        
-        if database.is_staff_user(email):
+        password = request.form.get('password', '')
+
+        # Rate limiting check
+        if _is_login_locked(email):
+            error = 'Too many failed attempts. Please try again in 15 minutes.'
+            return render_template('login.html', error=error)
+
+        user = database.verify_staff_credentials(email, password)
+        if user:
             session['user_email'] = email
+            session.permanent = True
+            _clear_login_attempts(email)
+            database.update_last_login(email)
+            # ── AUDIT: successful login ──────────────────────────────────────
+            audit.log_audit_event(
+                actor_email=email,
+                action='agent.login.success',
+                target_type='system',
+            )
             return redirect(url_for('dashboard'))
         else:
-            error = 'Access denied. Only authorized staff can log in.'
-    
-    return render_template('login.html', error=error, staff_users=database.get_staff_users())
+            _record_failed_attempt(email)
+            # ── AUDIT: failed login attempt ──────────────────────────────────
+            audit.log_audit_event(
+                actor_email=email or 'unknown',
+                action='agent.login.failed',
+                target_type='system',
+                details={'attempted_email': email},
+                success=False,
+            )
+            error = 'Invalid email or password.'
+
+    return render_template('login.html', error=error)
 
 
 @app.route('/other/logout')
 def logout():
     """Log out the current user."""
+    user = get_current_user()
+    if user:
+        # ── AUDIT: logout ────────────────────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='agent.logout',
+            target_type='system',
+        )
     session.pop('user_email', None)
     return redirect(url_for('login'))
 
@@ -161,14 +226,14 @@ def dashboard():
     """Main dashboard showing all account requests."""
     status_filter = request.args.get('status', 'All')
     search_query = request.args.get('search', '')
-    
+
     requests_list = database.get_all_requests(
         status_filter=status_filter if status_filter != 'All' else None,
         search_query=search_query if search_query else None
     )
-    
+
     counts = database.get_request_counts()
-    
+
     return render_template(
         'dashboard.html',
         requests=requests_list,
@@ -197,19 +262,67 @@ def api_request_detail(request_key):
     Returns rendered HTML partial for tab content.
     """
     req = database.get_request_by_key(request_key)
-    
+
     if not req:
         return jsonify({'error': 'Request not found'}), 404
-    
+
     comments = database.get_comments_for_request(request_key)
-    
+    audit_entries = audit.get_audit_log_for_request(request_key)
+
+    user = get_current_user()
+    # ── AUDIT: request viewed ────────────────────────────────────────────────
+    audit.log_audit_event(
+        actor_email=user['email'],
+        action='request.view',
+        target_type='request',
+        target_id=request_key,
+    )
+
     # Return rendered partial HTML for tab content
     return render_template(
         'partials/request_detail_content.html',
         request=req,
         comments=comments,
+        audit_entries=audit_entries,
         staff_users=database.get_staff_users()
     )
+
+
+# =============================================================================
+# API Routes - Password Management
+# =============================================================================
+
+@app.route('/other/api/change-password', methods=['POST'])
+@staff_required
+def api_change_password():
+    """Change the current user's password."""
+    data = request.get_json() or {}
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    user = get_current_user()
+    if not user:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    # Verify current password
+    if not database.verify_staff_credentials(user['email'], current_password):
+        return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
+
+    # Enforce minimum length
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'error': 'New password must be at least 8 characters'}), 400
+
+    # Set new password
+    success = database.set_staff_password(user['email'], new_password)
+
+    if success:
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='agent.password.change',
+            target_type='system',
+        )
+
+    return jsonify({'success': success})
 
 
 # =============================================================================
@@ -222,15 +335,27 @@ def api_update_status(request_key):
     """Update request status."""
     data = request.get_json() or {}
     new_status = data.get('status')
-    
+
     if not new_status:
         return jsonify({'success': False, 'error': 'Status is required'}), 400
-    
+
+    # Capture the current status BEFORE the update for a complete audit record.
+    existing = database.get_request_by_key(request_key)
+    old_status = existing.get('status') if existing else None
+
     success = database.update_request_status(request_key, new_status)
-    
+
+    user = get_current_user()
     if success:
-        # Add a comment noting the status change
-        user = get_current_user()
+        # ── AUDIT: status changed ────────────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.status.update',
+            target_type='request',
+            target_id=request_key,
+            details={'from': old_status, 'to': new_status},
+        )
+        # Keep the human-readable activity comment for the activity stream.
         database.add_comment(
             request_key,
             author_email=user['email'],
@@ -238,7 +363,7 @@ def api_update_status(request_key):
             body=f"Changed status to: {new_status}",
             comment_type='activity_log'
         )
-    
+
     return jsonify({'success': success})
 
 
@@ -248,12 +373,28 @@ def api_assign_request(request_key):
     """Assign request to a staff member."""
     data = request.get_json() or {}
     assignee_email = data.get('assignee_email')
-    
+
+    # Capture the current assignee BEFORE the update.
+    existing = database.get_request_by_key(request_key)
+    old_assignee = existing.get('assigned_to') if existing else None
+
     success = database.assign_request(request_key, assignee_email)
-    
-    if success and assignee_email:
-        user = get_current_user()
+
+    user = get_current_user()
+    if success:
         assignee_name = database.get_staff_name(assignee_email) or assignee_email
+        # ── AUDIT: assignment changed ────────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.assignment.update',
+            target_type='request',
+            target_id=request_key,
+            details={
+                'from': old_assignee,
+                'to': assignee_email,
+                'assignee_name': assignee_name,
+            },
+        )
         database.add_comment(
             request_key,
             author_email=user['email'],
@@ -261,7 +402,7 @@ def api_assign_request(request_key):
             body=f"Assigned to: {assignee_name}",
             comment_type='activity_log'
         )
-    
+
     return jsonify({'success': success})
 
 
@@ -271,10 +412,10 @@ def api_add_comment(request_key):
     """Add an internal note to a request."""
     data = request.get_json() or {}
     body = data.get('body', '').strip()
-    
+
     if not body:
         return jsonify({'success': False, 'error': 'Comment body is required'}), 400
-    
+
     user = get_current_user()
     comment = database.add_comment(
         request_key,
@@ -283,7 +424,20 @@ def api_add_comment(request_key):
         body=body,
         comment_type='note'
     )
-    
+
+    if comment:
+        # ── AUDIT: internal note added ───────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.comment.create',
+            target_type='request',
+            target_id=request_key,
+            details={
+                'comment_id': comment['id'],
+                'body_char_length': len(body),
+            },
+        )
+
     return jsonify({'success': bool(comment), 'comment': comment})
 
 
@@ -295,11 +449,11 @@ def api_send_email(request_key):
     to_list = data.get('to_list', [])
     subject = data.get('subject', '').strip()
     body = data.get('body', '').strip()
-    
+
     # Validate recipients
     if not isinstance(to_list, list) or not to_list:
         return jsonify({'success': False, 'error': 'At least one recipient is required'}), 400
-    
+
     # Clean recipient list
     to_list = [email.strip() for email in to_list if email.strip()]
     if not to_list:
@@ -307,11 +461,14 @@ def api_send_email(request_key):
 
     if not body:
         return jsonify({'success': False, 'error': 'Email body is required'}), 400
-    
+
     # Default subject if not provided
     if not subject:
-        subject = f"Re: iLab Account Request - {request_key}"
-    
+        req = database.get_request_by_key(request_key)
+        subject = f"Re: {req.get('original_subject', 'Your Account Request')}" if req else 'Your Account Request'
+
+    user = get_current_user()
+
     try:
         # Send the email
         notification_util.send_email(
@@ -319,9 +476,8 @@ def api_send_email(request_key):
             payload=body,
             to_list=to_list
         )
-        
-        # Log the sent email as a comment
-        user = get_current_user()
+
+        # Log the sent email as a comment (activity stream)
         recipients_str = ', '.join(to_list)
         database.add_comment(
             request_key,
@@ -331,10 +487,32 @@ def api_send_email(request_key):
             comment_type='email_sent',
             email_subject=subject
         )
-        
+
+        # ── AUDIT: outbound email sent ───────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.email.send',
+            target_type='request',
+            target_id=request_key,
+            details={
+                'recipients': to_list,
+                'subject': subject,
+                'body_char_length': len(body),
+            },
+        )
+
         return jsonify({'success': True})
-        
+
     except Exception as e:
+        # ── AUDIT: email send failure ────────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.email.send',
+            target_type='request',
+            target_id=request_key,
+            details={'recipients': to_list, 'subject': subject, 'error': str(e)},
+            success=False,
+        )
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -361,11 +539,11 @@ def parse_name_from_email(email):
 def webhook_new_request():
     """
     Webhook endpoint for Power Automate to send new email notifications.
-    
+
     Supports conversation threading via Outlook's conversationId:
     - If conversationId matches an existing request, the email is added as a comment
     - If no match, a new request is created
-    
+
     Expected payload:
     {
         "subject": "...",
@@ -381,18 +559,18 @@ def webhook_new_request():
     expected_key = os.environ.get('WEBHOOK_API_KEY')
     if expected_key and api_key != expected_key:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     data = request.get_json() or {}
-    
+
     subject = data.get('subject', '')
     body = data.get('body', '')
     sender = data.get('from', '')
     message_id = data.get('messageId', '')
     conversation_id = data.get('conversationId', '')
-    
+
     if not body:
         return jsonify({'success': False, 'error': 'Email body is required'}), 400
-    
+
     # Check for duplicate by source_email_id first
     if message_id:
         existing = database.get_all_requests()
@@ -403,20 +581,17 @@ def webhook_new_request():
                     'message': 'Duplicate email, request already exists',
                     'request_key': req['request_key']
                 })
-    
+
     # Check for existing conversation - if found, add as comment (reply threading)
     if conversation_id:
         existing_request = database.get_request_by_conversation_id(conversation_id)
         if existing_request:
-            # This is a reply to an existing conversation - add as comment
-            # Use requester's full name if this email is from the requester
             sender_lower = (sender or '').lower()
             if sender_lower == existing_request.get('requester_email', '').lower():
                 author_name = existing_request.get('requester_name') or parse_name_from_email(sender)
             else:
-                # Check if sender is a staff member, otherwise parse from email
                 author_name = database.get_staff_name(sender) or parse_name_from_email(sender)
-            
+
             database.add_comment(
                 existing_request['request_key'],
                 author_email=sender or 'unknown@unknown.com',
@@ -431,17 +606,16 @@ def webhook_new_request():
                 'request_key': existing_request['request_key'],
                 'action': 'comment_added'
             })
-    
+
     # No existing conversation - parse and create new request
     parsed = email_parser.parse_ilab_email(subject, body, sender)
-    
+
     if not parsed['is_valid']:
         return jsonify({
-            'success': False, 
+            'success': False,
             'error': 'Could not parse valid request data from email'
         }), 400
-    
-    # Create the request with conversation_id for future threading
+
     new_request = database.create_request(
         requester_email=parsed['requester_email'] or 'unknown@unknown.com',
         requester_name=parsed['requester_name'],
@@ -451,9 +625,10 @@ def webhook_new_request():
         source_email_id=message_id,
         conversation_id=conversation_id or None,
         request_type='Account Request',
-        ilab_link=parsed['ilab_link']
+        ilab_link=parsed['ilab_link'],
+        lab_name=parsed['lab_name']
     )
-    
+
     return jsonify({
         'success': True,
         'request_key': new_request['request_key'],
@@ -473,12 +648,12 @@ def import_request():
     if request.method == 'POST':
         subject = request.form.get('subject', '')
         body = request.form.get('body', '')
-        
+
         parsed = email_parser.parse_ilab_email(subject, body)
-        
+
         if not parsed['is_valid']:
             return render_template('import.html', error='Could not parse valid data from email')
-        
+
         new_request = database.create_request(
             requester_email=parsed['requester_email'] or 'unknown@unknown.com',
             requester_name=parsed['requester_name'],
@@ -486,12 +661,55 @@ def import_request():
             original_subject=subject,
             original_body=body,
             request_type='Account Request',
-            ilab_link=parsed['ilab_link']
+            ilab_link=parsed['ilab_link'],
+            lab_name=parsed['lab_name']
         )
-        
+
+        user = get_current_user()
+        # ── AUDIT: manual import ─────────────────────────────────────────────
+        audit.log_audit_event(
+            actor_email=user['email'],
+            action='request.import.create',
+            target_type='request',
+            target_id=new_request['request_key'],
+            details={
+                'source': 'manual_import',
+                'requester_email': new_request.get('requester_email'),
+            },
+        )
+
         return redirect(url_for('request_detail', request_key=new_request['request_key']))
-    
+
     return render_template('import.html')
+
+
+# =============================================================================
+# Audit Log Viewer (Staff Only)
+# =============================================================================
+
+@app.route('/other/audit')
+@staff_required
+def audit_log_viewer():
+    """
+    Cross-request audit log viewer for staff.
+    Supports filtering by agent and/or action category.
+    """
+    filter_agent = request.args.get('agent', '')
+    filter_action = request.args.get('action_prefix', '')
+
+    entries = audit.get_audit_log(
+        actor_email=filter_agent if filter_agent else None,
+        action_prefix=filter_action if filter_action else None,
+        limit=300,
+    )
+
+    return render_template(
+        'audit_log.html',
+        entries=entries,
+        staff_users=database.get_staff_users(),
+        filter_agent=filter_agent,
+        filter_action=filter_action,
+    )
 
 
 # =============================================================================
@@ -523,5 +741,10 @@ def server_error(e):
 # =============================================================================
 
 if __name__ == '__main__':
+    # Warn if using default secret key
+    secret = os.environ.get('FLASK_SECRET_KEY', '')
+    if not secret or 'dev-secret' in secret or 'change-in-prod' in secret:
+        print('\n  ⚠️  WARNING: Using default secret key. Set FLASK_SECRET_KEY in .env for production.\n')
+
     database.init_db()
     app.run(debug=True, port=5006)

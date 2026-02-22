@@ -5,6 +5,7 @@ Handles local SQLite database for storing account requests and comments.
 import sqlite3
 import os
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_NAME = 'account_requests.db'
 
@@ -32,6 +33,7 @@ def init_db():
             requester_email TEXT NOT NULL,
             requester_name TEXT,
             organization TEXT,
+            lab_name TEXT,
             request_type TEXT DEFAULT 'Account Request',
             original_subject TEXT,
             original_body TEXT,
@@ -62,13 +64,52 @@ def init_db():
     
     # Create index on request_key for fast lookup
     c.execute('CREATE INDEX IF NOT EXISTS idx_request_key ON requests(request_key)')
-    
+
+    # ── Audit Log Table ──────────────────────────────────────────────────────
+    # Append-only record of every significant support-agent action.
+    # This table must NEVER be updated or deleted from application code.
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id    TEXT    UNIQUE NOT NULL,
+            timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            actor_email TEXT    NOT NULL,
+            actor_ip    TEXT,
+            action      TEXT    NOT NULL,
+            target_type TEXT,
+            target_id   TEXT,
+            details     TEXT,
+            success     INTEGER NOT NULL DEFAULT 1
+        )
+    ''')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_actor_email ON audit_log(actor_email)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_action      ON audit_log(action)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_target_id   ON audit_log(target_id)')
+    # ────────────────────────────────────────────────────────────────────────
+
+    # ── Staff Users Table ─────────────────────────────────────────────────
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS staff_users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            email         TEXT    UNIQUE NOT NULL,
+            name          TEXT    NOT NULL,
+            password_hash TEXT    NOT NULL,
+            is_active     INTEGER DEFAULT 1,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login_at TIMESTAMP
+        )
+    ''')
+    # ────────────────────────────────────────────────────────────────────────
+
     conn.commit()
     conn.close()
-    
+
     # Run migrations for existing databases
     migrate_db()
-    
+
+    # Seed staff users if table is empty
+    seed_staff_users()
+
     print(f"✅ Database initialized: {get_db_path()}")
 
 
@@ -76,7 +117,7 @@ def migrate_db():
     """Apply schema migrations for existing databases."""
     conn = get_connection()
     c = conn.cursor()
-    
+
     # Migration: Add ilab_link column if it doesn't exist
     try:
         c.execute('ALTER TABLE requests ADD COLUMN ilab_link TEXT')
@@ -84,7 +125,35 @@ def migrate_db():
         print("  ↳ Migration applied: added 'ilab_link' column")
     except sqlite3.OperationalError:
         pass  # Column already exists
-    
+
+    # Migration: Add lab_name column if it doesn't exist
+    try:
+        c.execute('ALTER TABLE requests ADD COLUMN lab_name TEXT')
+        conn.commit()
+        print("  ↳ Migration applied: added 'lab_name' column")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Migration: Create audit_log table for existing databases that pre-date it
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id    TEXT    UNIQUE NOT NULL,
+            timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            actor_email TEXT    NOT NULL,
+            actor_ip    TEXT,
+            action      TEXT    NOT NULL,
+            target_type TEXT,
+            target_id   TEXT,
+            details     TEXT,
+            success     INTEGER NOT NULL DEFAULT 1
+        )
+    ''')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_actor_email ON audit_log(actor_email)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_action      ON audit_log(action)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_audit_target_id   ON audit_log(target_id)')
+    conn.commit()
+
     conn.close()
 
 
@@ -102,7 +171,8 @@ def generate_request_key():
 
 def create_request(requester_email, requester_name=None, organization=None, 
                    original_subject=None, original_body=None, source_email_id=None,
-                   conversation_id=None, request_type='Account Request', ilab_link=None):
+                   conversation_id=None, request_type='Account Request', ilab_link=None,
+                   lab_name=None):
     """
     Create a new account request.
     Returns the request dict with generated key.
@@ -116,13 +186,13 @@ def create_request(requester_email, requester_name=None, organization=None,
     c.execute('''
         INSERT INTO requests (
             request_key, requester_email, requester_name, organization,
-            request_type, original_subject, original_body, source_email_id,
-            conversation_id, ilab_link, created_at, updated_at
+            lab_name, request_type, original_subject, original_body,
+            source_email_id, conversation_id, ilab_link, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (request_key, requester_email.lower().strip(), requester_name, organization,
-          request_type, original_subject, original_body, source_email_id, conversation_id,
-          ilab_link, now, now))
+          lab_name, request_type, original_subject, original_body, source_email_id,
+          conversation_id, ilab_link, now, now))
     
     request_id = c.lastrowid
     conn.commit()
@@ -135,6 +205,7 @@ def create_request(requester_email, requester_name=None, organization=None,
         'requester_email': requester_email,
         'requester_name': requester_name,
         'organization': organization,
+        'lab_name': lab_name,
         'request_type': request_type,
         'original_subject': original_subject,
         'original_body': original_body,
@@ -326,33 +397,110 @@ def get_request_counts():
     return counts
 
 
-# Staff management
-STAFF_USERS = [
+# ─────────────────────────────────────────────────────────────────────────────
+# Staff Management (DB-backed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Legacy seed data — used ONLY to populate staff_users table on first run.
+_SEED_STAFF = [
     {'email': 'nadia.clark@agilent.com', 'name': 'Nadia Clark'},
     {'email': 'william.lai@agilent.com', 'name': 'William Lai'},
     {'email': 'elvira.carrera@agilent.com', 'name': 'Elvira Carrera'},
 ]
 
+_DEFAULT_PASSWORD = 'changeme123'
+
+
+def seed_staff_users():
+    """Seed the staff_users table from the legacy list if it's empty."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM staff_users')
+    count = c.fetchone()[0]
+
+    if count == 0:
+        hashed = generate_password_hash(_DEFAULT_PASSWORD)
+        for user in _SEED_STAFF:
+            c.execute('''
+                INSERT INTO staff_users (email, name, password_hash)
+                VALUES (?, ?, ?)
+            ''', (user['email'].lower().strip(), user['name'], hashed))
+        conn.commit()
+        print(f"  ⚠️  Seeded {len(_SEED_STAFF)} staff users with default password — change on first login")
+
+    conn.close()
+
 
 def get_staff_users():
-    """Return list of authorized staff users."""
-    return STAFF_USERS
+    """Return list of active staff users as [{email, name}, ...]."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT email, name FROM staff_users WHERE is_active = 1 ORDER BY name')
+    rows = c.fetchall()
+    conn.close()
+    return [{'email': r['email'], 'name': r['name']} for r in rows]
 
 
 def is_staff_user(email):
-    """Check if an email belongs to staff."""
+    """Check if an email belongs to an active staff member."""
     if not email:
         return False
-    email_lower = email.lower().strip()
-    return any(s['email'].lower() == email_lower for s in STAFF_USERS)
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT 1 FROM staff_users WHERE email = ? AND is_active = 1',
+              (email.lower().strip(),))
+    row = c.fetchone()
+    conn.close()
+    return row is not None
 
 
 def get_staff_name(email):
     """Get staff member's name by email."""
     if not email:
         return None
-    email_lower = email.lower().strip()
-    for s in STAFF_USERS:
-        if s['email'].lower() == email_lower:
-            return s['name']
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT name FROM staff_users WHERE email = ?',
+              (email.lower().strip(),))
+    row = c.fetchone()
+    conn.close()
+    return row['name'] if row else None
+
+
+def verify_staff_credentials(email, password):
+    """Verify email + password. Returns user dict or None."""
+    if not email or not password:
+        return None
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT * FROM staff_users WHERE email = ? AND is_active = 1',
+              (email.lower().strip(),))
+    row = c.fetchone()
+    conn.close()
+    if row and check_password_hash(row['password_hash'], password):
+        return dict(row)
     return None
+
+
+def set_staff_password(email, new_password):
+    """Set/update a staff user's password. Returns True if updated."""
+    hashed = generate_password_hash(new_password)
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('UPDATE staff_users SET password_hash = ? WHERE email = ?',
+              (hashed, email.lower().strip()))
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def update_last_login(email):
+    """Update last_login_at timestamp for a user."""
+    now = datetime.now().isoformat()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('UPDATE staff_users SET last_login_at = ? WHERE email = ?',
+              (now, email.lower().strip()))
+    conn.commit()
+    conn.close()

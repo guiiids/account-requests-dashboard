@@ -95,6 +95,35 @@
             box-shadow: 0 0 0 4px rgba(0, 87, 184, 0.1);
         }
 
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper .form-input {
+            padding-right: 3rem;
+        }
+
+        .pw-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #9ca3af;
+            font-size: 1.2rem;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s;
+        }
+
+        .pw-toggle:hover {
+            color: #4b5563;
+        }
+
         .btn-login {
             width: 100%;
             padding: 0.875rem;
@@ -124,41 +153,6 @@
             align-items: center;
             gap: 0.5rem;
         }
-
-        .staff-hint {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-        }
-
-        .staff-hint-title {
-            font-size: 0.8rem;
-            color: #6b7280;
-            margin-bottom: 0.75rem;
-        }
-
-        .staff-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            justify-content: center;
-        }
-
-        .staff-chip {
-            background: #f3f4f6;
-            padding: 0.35rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            color: #4b5563;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .staff-chip:hover {
-            background: var(--agilent-blue);
-            color: white;
-        }
     </style>
 </head>
 
@@ -166,7 +160,7 @@
     <div class="login-card">
         <div class="login-header">
             <div class="login-icon">
-                <i class="ph ph-user-circle-plus"></i>
+                <i class="ph ph-lock-simple"></i>
             </div>
             <h1 class="login-title">Account Requests</h1>
             <p class="login-subtitle">Staff login for iLab request management</p>
@@ -181,27 +175,41 @@
 
         <form method="POST">
             <div class="form-group">
-                <label class="form-label" for="email">Staff Email</label>
+                <label class="form-label" for="email">Email Address</label>
                 <input type="email" id="email" name="email" class="form-input" placeholder="name@agilent.com" required
                     autofocus>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <div class="password-wrapper">
+                    <input type="password" id="password" name="password" class="form-input"
+                        placeholder="Enter your password" required>
+                    <button type="button" class="pw-toggle" onclick="togglePw()" title="Show password">
+                        <i id="pw-icon" class="ph ph-eye"></i>
+                    </button>
+                </div>
             </div>
 
             <button type="submit" class="btn-login">
                 Sign In
             </button>
         </form>
-
-        <div class="staff-hint">
-            <div class="staff-hint-title">Authorized Staff</div>
-            <div class="staff-list">
-                {% for user in staff_users %}
-                <span class="staff-chip" onclick="document.getElementById('email').value='{{ user.email }}'">
-                    {{ user.name }}
-                </span>
-                {% endfor %}
-            </div>
-        </div>
     </div>
+
+    <script>
+        function togglePw() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('pw-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'ph ph-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'ph ph-eye';
+            }
+        }
+    </script>
 </body>
 
 </html>

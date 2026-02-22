@@ -108,8 +108,7 @@
                                 {% if is_agent %}
                                 <span
                                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-br from-agilent-blue to-agilent-dark text-white shadow-sm">
-                                    <i class="ph-bold ph-headset"></i> Support Agent
-                                </span>
+                                    <i class="ph-bold ph-headset"></i> Support                                </span>
                                 {% elif is_system %}
                                 <span
                                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
@@ -314,8 +313,8 @@
             position: relative;
         }
         .custom-select-trigger {
-            width: 100%;
-            display: flex;
+            width: auto;
+            display: inline-flex;
             align-items: center;
             justify-content: space-between;
             gap: 0.5rem;
@@ -350,7 +349,8 @@
         .custom-select-dropdown {
             position: absolute;
             top: calc(100% + 6px);
-            left: 0; right: 0;
+            right: 0;
+            min-width: 180px;
             background: #fff;
             border: 1.5px solid #e2e8f0;
             border-radius: 12px;
@@ -538,12 +538,13 @@
                     <i class="ph-bold ph-sliders-horizontal"></i> Status & Owner
                 </div>
 
-                <!-- Custom Status Dropdown -->
-                <div style="margin-bottom: 0.75rem;">
-                    <div style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.4rem;">Status</div>
-                    <div class="custom-select-wrapper" id="status-select-wrapper-{{ request.request_key }}">
+                <!-- Custom Status Dropdown (inline) -->
+                <div class="meta-row" style="margin-bottom: 0.5rem;">
+                    <span class="meta-label">Status</span>
+                    <div class="custom-select-wrapper" id="status-select-wrapper-{{ request.request_key }}" style="flex: 0 1 auto; min-width: 0;">
                         <div class="custom-select-trigger" id="status-trigger-{{ request.request_key }}"
-                             onclick="toggleCustomSelect('status', '{{ request.request_key }}')">
+                             onclick="toggleCustomSelect('status', '{{ request.request_key }}')"
+                             style="padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.8rem;">
                             <span style="display:flex;align-items:center;gap:0.5rem;">
                                 <span class="option-dot
                                     {% if request.status == 'Open' %}dot-open
@@ -570,12 +571,13 @@
                     </div>
                 </div>
 
-                <!-- Custom Assignee Dropdown -->
-                <div>
-                    <div style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.4rem;">Assignee</div>
-                    <div class="custom-select-wrapper" id="assignee-select-wrapper-{{ request.request_key }}">
+                <!-- Custom Assignee Dropdown (inline) -->
+                <div class="meta-row">
+                    <span class="meta-label">Assignee</span>
+                    <div class="custom-select-wrapper" id="assignee-select-wrapper-{{ request.request_key }}" style="flex: 0 1 auto; min-width: 0;">
                         <div class="custom-select-trigger" id="assignee-trigger-{{ request.request_key }}"
-                             onclick="toggleCustomSelect('assignee', '{{ request.request_key }}')">
+                             onclick="toggleCustomSelect('assignee', '{{ request.request_key }}')"
+                             style="padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.8rem;">
                             <span style="display:flex;align-items:center;gap:0.5rem;">
                                 <span class="option-dot {% if request.assigned_to %}dot-person{% else %}dot-unassigned{% endif %}"></span>
                                 <span id="assignee-display-{{ request.request_key }}">
@@ -607,20 +609,31 @@
                 <div class="sidebar-section-label">
                     <i class="ph-bold ph-user"></i> Requester
                 </div>
-                <div class="requester-card">
-                    <div class="requester-avatar">{{ request.requester_name|get_initials }}</div>
-                    <div style="min-width:0; flex:1;">
-                        <div class="requester-name">{{ request.requester_name or 'Unknown' }}</div>
-                        <a href="mailto:{{ request.requester_email }}" class="requester-email">
-                            {{ request.requester_email }}
-                        </a>
+                <div class="requester-card" style="flex-direction: column; align-items: stretch; gap: 0;">
+                    <div style="display: flex; align-items: center; gap: 0.875rem;">
+                        <div class="requester-avatar">{{ request.requester_name|get_initials }}</div>
+                        <div style="min-width:0; flex:1;">
+                            <div class="requester-name">{{ request.requester_name or 'Unknown' }}</div>
+                            <a href="mailto:{{ request.requester_email }}" class="requester-email">
+                                {{ request.requester_email }}
+                            </a>
+                        </div>
                     </div>
+                    {% if request.organization or request.lab_name %}
+                    <div style="margin-top: 0.625rem; padding-top: 0.625rem; border-top: 1px solid #e2e8f0;">
+                        {% if request.organization %}
+                        <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 0.375rem;">
+                            <i class="ph-bold ph-buildings"></i> {{ request.organization }}
+                        </div>
+                        {% endif %}
+                        {% if request.lab_name %}
+                        <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 0.375rem; {% if request.organization %}margin-top: 0.25rem;{% endif %}">
+                            <i class="ph-bold ph-flask"></i> {{ request.lab_name }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
-                {% if request.organization %}
-                <div class="requester-org">
-                    <i class="ph-bold ph-buildings"></i> {{ request.organization }}
-                </div>
-                {% endif %}
 
                 <div class="sidebar-divider"></div>
 

@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-surface-800">Support Agent Audit Trail</h1>
+            <p class="text-xs text-surface-500 mt-0.5">Immutable record of all agent actions. Read-only.</p>
+        </div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 border border-surface-200 text-xs font-bold text-surface-600">
+            <i class="ph-bold ph-shield-check text-agilent-blue"></i>
+            {{ entries|length }} entries shown
+        </span>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="{{ url_for('audit_log_viewer') }}"
+          class="bg-white rounded-xl border border-surface-200 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+
+        <div class="flex flex-col gap-1 min-w-[200px]">
+            <label class="text-xs font-bold text-surface-500 uppercase tracking-wide">Agent</label>
+            <select name="agent"
+                    class="text-xs border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700 focus:outline-none focus:ring-2 focus:ring-agilent-blue/30 focus:border-agilent-blue">
+                <option value="">All Agents</option>
+                {% for staff in staff_users %}
+                <option value="{{ staff.email }}" {% if filter_agent == staff.email %}selected{% endif %}>
+                    {{ staff.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex flex-col gap-1 min-w-[200px]">
+            <label class="text-xs font-bold text-surface-500 uppercase tracking-wide">Action Category</label>
+            <select name="action_prefix"
+                    class="text-xs border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700 focus:outline-none focus:ring-2 focus:ring-agilent-blue/30 focus:border-agilent-blue">
+                <option value="">All Actions</option>
+                <option value="agent." {% if filter_action == 'agent.' %}selected{% endif %}>Authentication</option>
+                <option value="request.status" {% if filter_action == 'request.status' %}selected{% endif %}>Status Changes</option>
+                <option value="request.assignment" {% if filter_action == 'request.assignment' %}selected{% endif %}>Assignments</option>
+                <option value="request.comment" {% if filter_action == 'request.comment' %}selected{% endif %}>Notes Added</option>
+                <option value="request.email" {% if filter_action == 'request.email' %}selected{% endif %}>Emails Sent</option>
+                <option value="request.import" {% if filter_action == 'request.import' %}selected{% endif %}>Manual Imports</option>
+                <option value="request.view" {% if filter_action == 'request.view' %}selected{% endif %}>Request Views</option>
+            </select>
+        </div>
+
+        <button type="submit"
+                class="px-4 py-2 rounded-lg bg-agilent-blue text-white text-xs font-bold hover:bg-agilent-dark transition-colors">
+            <i class="ph-bold ph-funnel"></i> Apply Filters
+        </button>
+
+        {% if filter_agent or filter_action %}
+        <a href="{{ url_for('audit_log_viewer') }}"
+           class="px-4 py-2 rounded-lg border border-surface-200 bg-white text-surface-600 text-xs font-bold hover:bg-surface-50 transition-colors">
+            <i class="ph-bold ph-x"></i> Clear
+        </a>
+        {% endif %}
+    </form>
+
+    <!-- Audit Table -->
+    <div class="bg-white rounded-xl border border-surface-200 shadow-sm overflow-hidden">
+
+        {% if entries %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="bg-surface-50 border-b border-surface-200">
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide whitespace-nowrap">Timestamp (UTC)</th>
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide">Agent</th>
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide">Action</th>
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide">Request</th>
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide">Details</th>
+                        <th class="px-4 py-3 text-left font-bold text-surface-500 uppercase tracking-wide">IP Address</th>
+                        <th class="px-4 py-3 text-center font-bold text-surface-500 uppercase tracking-wide">Result</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-100 font-mono">
+                    {% for entry in entries %}
+                    <tr class="hover:bg-surface-50/60 transition-colors">
+
+                        <!-- Timestamp -->
+                        <td class="px-4 py-2.5 text-surface-500 whitespace-nowrap">
+                            {{ entry.timestamp | replace('T', ' ') | truncate(19, True, '') }}
+                        </td>
+
+                        <!-- Agent -->
+                        <td class="px-4 py-2.5">
+                            <span class="font-bold text-surface-700">{{ entry.actor_email }}</span>
+                        </td>
+
+                        <!-- Action badge -->
+                        <td class="px-4 py-2.5 whitespace-nowrap">
+                            {% if entry.action.startswith('agent.login') %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold">
+                                <i class="ph-bold ph-sign-in"></i> {{ entry.action }}
+                            </span>
+                            {% elif entry.action == 'agent.logout' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200 font-bold">
+                                <i class="ph-bold ph-sign-out"></i> {{ entry.action }}
+                            </span>
+                            {% elif 'status' in entry.action %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold">
+                                <i class="ph-bold ph-arrows-clockwise"></i> {{ entry.action }}
+                            </span>
+                            {% elif 'assignment' in entry.action %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 font-bold">
+                                <i class="ph-bold ph-user-switch"></i> {{ entry.action }}
+                            </span>
+                            {% elif 'email' in entry.action %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                                <i class="ph-bold ph-paper-plane-right"></i> {{ entry.action }}
+                            </span>
+                            {% elif 'comment' in entry.action %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold">
+                                <i class="ph-bold ph-chat-text"></i> {{ entry.action }}
+                            </span>
+                            {% elif 'import' in entry.action %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-bold">
+                                <i class="ph-bold ph-file-arrow-up"></i> {{ entry.action }}
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-100 text-surface-600 border border-surface-200 font-bold">
+                                <i class="ph-bold ph-dot"></i> {{ entry.action }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Target request key -->
+                        <td class="px-4 py-2.5">
+                            {% if entry.target_id and entry.target_id.startswith('ACCT-') %}
+                            <a href="{{ url_for('dashboard') }}#tab={{ entry.target_id }}"
+                               class="text-agilent-blue font-bold hover:underline">
+                                {{ entry.target_id }}
+                            </a>
+                            {% else %}
+                            <span class="text-surface-400">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Details (rendered from JSON dict) -->
+                        <td class="px-4 py-2.5 text-surface-600 max-w-xs">
+                            {% if entry.details %}
+                            <div class="flex flex-wrap gap-1">
+                                {% for k, v in entry.details.items() %}
+                                {% if v is not none and v != '' %}
+                                <span class="inline-block bg-surface-100 rounded px-1.5 py-0.5 text-[10px] text-surface-600">
+                                    <span class="text-surface-400">{{ k }}:</span>
+                                    {% if v is iterable and v is not string %}
+                                        {{ v | join(', ') | truncate(40) }}
+                                    {% else %}
+                                        {{ v | string | truncate(40) }}
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-surface-300">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- IP Address -->
+                        <td class="px-4 py-2.5 text-surface-400 whitespace-nowrap">
+                            {{ entry.actor_ip or '—' }}
+                        </td>
+
+                        <!-- Success / Failure -->
+                        <td class="px-4 py-2.5 text-center">
+                            {% if entry.success %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200" title="Success">
+                                <i class="ph-bold ph-check text-emerald-600 text-[10px]"></i>
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-50 border border-red-200" title="Failed">
+                                <i class="ph-bold ph-x text-red-600 text-[10px]"></i>
+                            </span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% else %}
+        <div class="text-center py-20">
+            <div class="h-14 w-14 mx-auto rounded-full bg-surface-100 flex items-center justify-center mb-4">
+                <i class="ph-duotone ph-shield-check text-3xl text-surface-300"></i>
+            </div>
+            <p class="text-surface-600 font-semibold text-sm">No audit entries found</p>
+            <p class="text-surface-400 text-xs mt-1">Try adjusting the filters above.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

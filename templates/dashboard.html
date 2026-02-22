@@ -286,6 +286,13 @@
 
                 const html = await response.text();
                 tab.contentEl.innerHTML = html;
+
+                // Scripts loaded via innerHTML don't auto-execute — re-create them
+                tab.contentEl.querySelectorAll('script').forEach(oldScript => {
+                    const newScript = document.createElement('script');
+                    newScript.textContent = oldScript.textContent;
+                    oldScript.parentNode.replaceChild(newScript, oldScript);
+                });
             } catch (error) {
                 tab.contentEl.innerHTML = `
                     <div class="empty-state">

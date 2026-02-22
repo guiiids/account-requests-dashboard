@@ -56,7 +56,7 @@
                 <div class="brand-wrapper">
                     <!-- Agilent/iLab Brand Placeholder -->
                     <i class="ph-fill ph-flask brand-icon"></i>
-                    <span>iLab Control</span>
+                    <span>iLab Supportl</span>
                 </div>
             </div>
 
@@ -70,6 +70,12 @@
                     class="nav-item {% if request.endpoint == 'import_request' %}active{% endif %}">
                     <i class="ph ph-file-arrow-up"></i>
                     <span>Import Data</span>
+                </a>
+
+                <a href="{{ url_for('audit_log_viewer') }}"
+                    class="nav-item {% if request.endpoint == 'audit_log_viewer' %}active{% endif %}">
+                    <i class="ph ph-shield-check"></i>
+                    <span>Audit Log</span>
                 </a>
 
                 <!-- Mock-up items for 'Evolved' feel -->
@@ -92,12 +98,57 @@
                         <span class="user-name">{{ current_user.name }}</span>
                         <span class="user-role">Administrator</span>
                     </div>
+                    <a href="#" onclick="event.preventDefault(); document.getElementById('pw-modal-overlay').classList.add('active');"
+                       class="logout-btn" title="Change Password" style="margin-right: -0.25rem;">
+                        <i class="ph ph-lock-simple"></i>
+                    </a>
                     <a href="{{ url_for('logout') }}" class="logout-btn" title="Sign Out">
                         <i class="ph ph-sign-out"></i>
                     </a>
                 </div>
             </div>
         </aside>
+
+        <!-- Change Password Modal -->
+        <div id="pw-modal-overlay" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('active');">
+            <div class="modal" style="max-width: 420px;">
+                <div class="modal-header">
+                    <h3 style="font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="ph ph-lock-simple"></i> Change Password
+                    </h3>
+                    <button onclick="document.getElementById('pw-modal-overlay').classList.remove('active');"
+                            style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:#9ca3af;">
+                        <i class="ph ph-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="pw-change-error" style="display:none; background:#fef2f2; color:#dc2626; padding:0.75rem 1rem; border-radius:8px; font-size:0.875rem; margin-bottom:1rem; align-items:center; gap:0.5rem;">
+                        <i class="ph ph-warning-circle"></i>
+                        <span id="pw-change-error-text"></span>
+                    </div>
+                    <div id="pw-change-success" style="display:none; background:#f0fdf4; color:#16a34a; padding:0.75rem 1rem; border-radius:8px; font-size:0.875rem; margin-bottom:1rem; align-items:center; gap:0.5rem;">
+                        <i class="ph ph-check-circle"></i>
+                        <span>Password changed successfully!</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" id="pw-current" class="form-input" placeholder="Enter current password">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <input type="password" id="pw-new" class="form-input" placeholder="Minimum 8 characters">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" id="pw-confirm" class="form-input" placeholder="Repeat new password">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="document.getElementById('pw-modal-overlay').classList.remove('active');">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitPasswordChange()">Update Password</button>
+                </div>
+            </div>
+        </div>
 
         <!-- MAIN CONTENT -->
         <main class="main-content">
@@ -133,6 +184,62 @@
     {% endif %}
 
     {% block extra_js %}{% endblock %}
+
+    <script>
+    function submitPasswordChange() {
+        const current = document.getElementById('pw-current').value;
+        const newPw = document.getElementById('pw-new').value;
+        const confirm = document.getElementById('pw-confirm').value;
+        const errBox = document.getElementById('pw-change-error');
+        const errText = document.getElementById('pw-change-error-text');
+        const succBox = document.getElementById('pw-change-success');
+
+        errBox.style.display = 'none';
+        succBox.style.display = 'none';
+
+        if (!current || !newPw || !confirm) {
+            errText.textContent = 'All fields are required.';
+            errBox.style.display = 'flex';
+            return;
+        }
+        if (newPw.length < 8) {
+            errText.textContent = 'New password must be at least 8 characters.';
+            errBox.style.display = 'flex';
+            return;
+        }
+        if (newPw !== confirm) {
+            errText.textContent = 'New passwords do not match.';
+            errBox.style.display = 'flex';
+            return;
+        }
+
+        fetch('/other/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: current, new_password: newPw })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                succBox.style.display = 'flex';
+                document.getElementById('pw-current').value = '';
+                document.getElementById('pw-new').value = '';
+                document.getElementById('pw-confirm').value = '';
+                setTimeout(() => {
+                    document.getElementById('pw-modal-overlay').classList.remove('active');
+                    succBox.style.display = 'none';
+                }, 1500);
+            } else {
+                errText.textContent = data.error || 'Failed to change password.';
+                errBox.style.display = 'flex';
+            }
+        })
+        .catch(() => {
+            errText.textContent = 'Network error. Please try again.';
+            errBox.style.display = 'flex';
+        });
+    }
+    </script>
 </body>
 
 </html>

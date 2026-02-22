@@ -1,112 +1,40 @@
-# AccountRequests-Dashboard
+# Audit Trail System — Delivery Package
 
-![Status](https://img.shields.io/badge/status-active-success.svg)
-![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)
+This package contains all files changed or created to implement the support-agent audit trail system in the `account-requests-dashboard` application.
 
-> A staff-only dashboard for managing iLab account signup requests with automated email parsing and workflow management.
+## Files Included
 
-## 📖 Overview
+| File | Type | Description |
+| :--- | :--- | :--- |
+| `audit.py` | **New** | Core audit module. Contains `log_audit_event()` and query helpers. Drop into the project root. |
+| `database.py` | **Updated** | Adds `audit_log` table creation to `init_db()` and `migrate_db()`. Safe to run on existing databases. |
+| `app.py` | **Updated** | All agent action routes now call `audit.log_audit_event()`. New `/other/audit` viewer route added. |
+| `audit_log.html` | **New** | Jinja2 template for the cross-request audit log viewer page. Place in `templates/`. |
+| `base.html` | **Updated** | Sidebar navigation updated to include an **Audit Log** link. |
 
-The **AccountRequests-Dashboard** streamlines the process of handling new user account requests for iLab. It replaces manual email tracking with a centralized dashboard that automatically ingests request emails, parses key details (requester, organization), and allows staff to manage the approval lifecycle.
+## Installation
 
-**Key Features:**
--   **Automated Ingestion**: Webhook integration with Power Automate to parse incoming emails.
--   **Smart Parsing**: Extracts requester name, email, and institution from unstructured email bodies.
--   **Worklow Management**: distinct states (Open, In Progress, Closed) and assignment logic.
--   **Conversation Threading**: Groups follow-up emails into a single request thread.
--   **Staff-Only Access**: Secure login restricted to authorized support staff.
+1. Copy `audit.py` to the project root (alongside `app.py`).
+2. Replace `app.py`, `database.py`, and `templates/base.html` with the updated versions.
+3. Copy `audit_log.html` into the `templates/` directory.
+4. Restart the application. On first start, `init_db()` / `migrate_db()` will automatically create the `audit_log` table and its indexes in the existing SQLite database — no manual SQL required.
 
-## 📸 Screenshots
-*(Placeholder for dashboard screenshot)*
+## New Endpoint
 
-## 🛠 Prerequisites
+| Method | URL | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/other/audit` | Staff only | Cross-request audit log viewer with agent and action-category filters. |
 
-Ensure you have the following installed:
--   Python 3.11+
--   SQLite (Pre-installed on macOS/Linux)
+## Audited Events
 
-## 🚀 Installation
-
-### 1. Clone the repository
-```bash
-git clone <repository_url>
-cd AccountRequests-Dashboard
-```
-
-### 2. Set up virtual environment
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-```
-
-### 3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Environment Configuration
-Create a `.env` file based on the example:
-```bash
-cp .env.example .env
-```
-**Required Variables:**
--   `FLASK_SECRET_KEY`: Random string for session security.
--   `WEBHOOK_API_KEY`: Secret key for validating Power Automate requests.
--   `SMTP_SERVER`: (Optional) SMTP server for outgoing notifications.
-
-## 🏃‍♂️ Usage
-
-### Start the Application
-```bash
-python app.py
-```
-The dashboard will be available at `http://localhost:5006`.
-
-### Initial Setup
-On first run, the application automatically initializes the SQLite database at `account_requests.db`.
-
-## 📂 Project Structure
-
-```text
-.
-├── app.py                  # Main Flask application & routes
-├── database.py             # SQLite schema and data access layer
-├── email_parser.py         # Regex logic for parsing email content
-├── notification_util.py    # Utilities for sending emails/Teams messages
-├── templates/              # Jinja2 HTML templates
-│   ├── dashboard.html      # Main view
-│   └── partials/           # HTMX partials for dynamic tabs
-├── static/                 # CSS/JS assets
-└── account_requests.db     # Local SQLite database (auto-generated)
-```
-
-## 🔌 API & Webhooks
-
-### Investion Webhook
-**Endpoint**: `POST /api/webhook/new-request`
-**Headers**: `X-API-Key: <WEBHOOK_API_KEY>`
-**Payload**:
-```json
-{
-  "subject": "New Account Request",
-  "body": "Requester: John Doe...",
-  "from": "john.doe@example.com",
-  "messageId": "<unique-id>",
-  "conversationId": "<thread-id>"
-}
-```
-
-## 🧪 Testing
-
-To run the test suite:
-```bash
-pytest tests/
-```
-
-## 🤝 Contributing
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/NewParser`)
-3.  Commit your Changes (`git commit -m 'Improve email parsing logic'`)
-4.  Push to the Branch (`git push origin feature/NewParser`)
-5.  Open a Pull Request
-# account-requests-dashboard
+| Event | Trigger |
+| :--- | :--- |
+| `agent.login.success` | Successful staff login |
+| `agent.login.failed` | Failed login attempt (wrong email) |
+| `agent.logout` | Staff logout |
+| `request.status.update` | Status changed (captures before/after values) |
+| `request.assignment.update` | Request assigned (captures before/after assignee) |
+| `request.comment.create` | Internal note added |
+| `request.email.send` | Outbound email sent to requester |
+| `request.import.create` | Request manually imported |
+| `request.view` | Request detail tab opened by an agent |
