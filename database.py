@@ -422,7 +422,7 @@ def seed_staff_users():
         hashed = generate_password_hash(_DEFAULT_PASSWORD)
         for user in _SEED_STAFF:
             c.execute('''
-                INSERT INTO staff_users (email, name, password_hash)
+                INSERT OR IGNORE INTO staff_users (email, name, password_hash)
                 VALUES (?, ?, ?)
             ''', (user['email'].lower().strip(), user['name'], hashed))
         conn.commit()
