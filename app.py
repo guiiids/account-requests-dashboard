@@ -67,13 +67,27 @@ def staff_required(f):
     return decorated_function
 
 
+def admin_required(f):
+    """Decorator to require admin role for a route."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_email = session.get('user_email')
+        if not user_email or not database.is_staff_user(user_email):
+            return redirect(url_for('login'))
+        if database.get_staff_role(user_email) != 'admin':
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 def get_current_user():
     """Get the current logged-in user info."""
     email = session.get('user_email')
     if email:
         return {
             'email': email,
-            'name': database.get_staff_name(email) or email.split('@')[0]
+            'name': database.get_staff_name(email) or email.split('@')[0],
+            'role': database.get_staff_role(email) or 'user',
         }
     return None
 
@@ -176,7 +190,7 @@ def login():
         user = database.verify_staff_credentials(email, password)
         if user:
             session['user_email'] = email
-            session.permanent = True
+            session.permanent = bool(request.form.get('remember'))
             _clear_login_attempts(email)
             database.update_last_login(email)
             # ── AUDIT: successful login ──────────────────────────────────────
@@ -185,7 +199,7 @@ def login():
                 action='agent.login.success',
                 target_type='system',
             )
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('force_change_password') if database.must_change_password(email) else url_for('dashboard'))
         else:
             _record_failed_attempt(email)
             # ── AUDIT: failed login attempt ──────────────────────────────────
@@ -198,7 +212,7 @@ def login():
             )
             error = 'Invalid email or password.'
 
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, attempted_email=request.form.get('email', '') if request.method == 'POST' else '')
 
 
 @app.route('/other/logout')
@@ -214,6 +228,129 @@ def logout():
         )
     session.pop('user_email', None)
     return redirect(url_for('login'))
+
+
+# =============================================================================
+# Routes - Force Password Change
+# =============================================================================
+
+@app.route('/other/change-password', methods=['GET', 'POST'])
+@staff_required
+def force_change_password():
+    """Force user to change password on first login."""
+    user = get_current_user()
+    error = None
+    success = None
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if len(new_password) < 8:
+            error = 'Password must be at least 8 characters.'
+        elif new_password != confirm_password:
+            error = 'Passwords do not match.'
+        else:
+            database.set_staff_password(user['email'], new_password)
+            audit.log_audit_event(
+                actor_email=user['email'],
+                action='agent.password.change',
+                target_type='system',
+                details={'forced': True},
+            )
+            return redirect(url_for('dashboard'))
+
+    return render_template('change_password.html', error=error)
+
+
+# =============================================================================
+# Routes - User Management (Staff Only)
+# =============================================================================
+
+@app.route('/other/users')
+@admin_required
+def manage_users():
+    """Admin page to manage staff users."""
+    users = database.get_all_staff_users()
+    return render_template('users.html', users=users, default_password=database._DEFAULT_PASSWORD)
+
+
+@app.route('/other/api/users', methods=['POST'])
+@admin_required
+def api_create_user():
+    """Create a new staff user."""
+    data = request.get_json() or {}
+    email = data.get('email', '').lower().strip()
+    name = data.get('name', '').strip()
+
+    if not email or not name:
+        return jsonify({'success': False, 'error': 'Email and name are required'}), 400
+
+    user = database.create_staff_user(email, name)
+    if not user:
+        return jsonify({'success': False, 'error': 'A user with this email already exists'}), 400
+
+    actor = get_current_user()
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='agent.user.create',
+        target_type='user',
+        target_id=email,
+        details={'name': name},
+    )
+
+    return jsonify({'success': True, 'user': user})
+
+
+@app.route('/other/api/users/<email>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_user(email):
+    """Activate or deactivate a staff user."""
+    actor = get_current_user()
+    if actor['email'].lower() == email.lower():
+        return jsonify({'success': False, 'error': 'You cannot deactivate yourself'}), 400
+
+    new_status = database.toggle_staff_active(email)
+    if new_status is None:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='agent.user.toggle',
+        target_type='user',
+        target_id=email,
+        details={'is_active': new_status},
+    )
+
+    return jsonify({'success': True, 'is_active': new_status})
+
+
+@app.route('/other/api/users/<email>/role', methods=['POST'])
+@admin_required
+def api_change_role(email):
+    """Change a staff user's role (admin/user)."""
+    actor = get_current_user()
+    if actor['email'].lower() == email.lower():
+        return jsonify({'success': False, 'error': 'You cannot change your own role'}), 400
+
+    data = request.get_json() or {}
+    new_role = data.get('role', '')
+    if new_role not in ('admin', 'user'):
+        return jsonify({'success': False, 'error': 'Invalid role'}), 400
+
+    success = database.set_staff_role(email, new_role)
+    if not success:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='agent.user.role_change',
+        target_type='user',
+        target_id=email,
+        details={'new_role': new_role},
+    )
+
+    return jsonify({'success': True, 'role': new_role})
 
 
 # =============================================================================

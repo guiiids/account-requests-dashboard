@@ -153,10 +153,50 @@
             align-items: center;
             gap: 0.5rem;
         }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: #dc2626;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.3);
+            opacity: 0;
+            animation: toastIn 0.3s ease forwards;
+            z-index: 9999;
+        }
+
+        .toast.out {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastIn {
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @keyframes toastOut {
+            to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
     </style>
 </head>
 
 <body>
+    {% if error %}
+    <div class="toast" id="error-toast">
+        <i class="ph ph-warning-circle"></i>
+        {{ error }}
+    </div>
+    {% endif %}
+
     <div class="login-card">
         <div class="login-header">
             <div class="login-icon">
@@ -166,18 +206,11 @@
             <p class="login-subtitle">Staff login for iLab request management</p>
         </div>
 
-        {% if error %}
-        <div class="error-message">
-            <i class="ph ph-warning-circle"></i>
-            {{ error }}
-        </div>
-        {% endif %}
-
         <form method="POST">
             <div class="form-group">
                 <label class="form-label" for="email">Email Address</label>
-                <input type="email" id="email" name="email" class="form-input" placeholder="name@agilent.com" required
-                    autofocus>
+                <input type="email" id="email" name="email" class="form-input" placeholder="name@agilent.com"
+                    value="{{ attempted_email or '' }}" required autofocus>
             </div>
 
             <div class="form-group">
@@ -189,6 +222,11 @@
                         <i id="pw-icon" class="ph ph-eye"></i>
                     </button>
                 </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1.5rem;">
+                <input type="checkbox" id="remember" name="remember" style="width:16px; height:16px; accent-color:var(--agilent-blue); cursor:pointer;">
+                <label for="remember" style="font-size:0.875rem; color:#6b7280; cursor:pointer;">Remember me</label>
             </div>
 
             <button type="submit" class="btn-login">
@@ -208,6 +246,15 @@
                 input.type = 'password';
                 icon.className = 'ph ph-eye';
             }
+        }
+
+        // Auto-dismiss toast
+        const toast = document.getElementById('error-toast');
+        if (toast) {
+            setTimeout(() => {
+                toast.classList.add('out');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
     </script>
 </body>

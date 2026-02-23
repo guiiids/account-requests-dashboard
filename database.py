@@ -10,7 +10,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_NAME = 'account_requests.db'
 
 def get_db_path():
-    """Get absolute path to the database file."""
+    """Get absolute path to the database file.
+    Uses DB_PATH env var if set (for Azure persistent mount), otherwise
+    defaults to the project directory.
+    """
+    custom_path = os.environ.get('DB_PATH')
+    if custom_path:
+        return custom_path
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), DB_NAME)
 
 def get_connection():
@@ -96,7 +102,9 @@ def init_db():
             password_hash TEXT    NOT NULL,
             is_active     INTEGER DEFAULT 1,
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login_at TIMESTAMP
+            last_login_at TIMESTAMP,
+            must_change_password INTEGER DEFAULT 1,
+            role          TEXT    DEFAULT 'user'
         )
     ''')
     # ────────────────────────────────────────────────────────────────────────
@@ -131,6 +139,22 @@ def migrate_db():
         c.execute('ALTER TABLE requests ADD COLUMN lab_name TEXT')
         conn.commit()
         print("  ↳ Migration applied: added 'lab_name' column")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Migration: Add must_change_password column to staff_users
+    try:
+        c.execute('ALTER TABLE staff_users ADD COLUMN must_change_password INTEGER DEFAULT 1')
+        conn.commit()
+        print("  ↳ Migration applied: added 'must_change_password' column")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Migration: Add role column to staff_users
+    try:
+        c.execute("ALTER TABLE staff_users ADD COLUMN role TEXT DEFAULT 'user'")
+        conn.commit()
+        print("  ↳ Migration applied: added 'role' column")
     except sqlite3.OperationalError:
         pass  # Column already exists
 
@@ -422,8 +446,8 @@ def seed_staff_users():
         hashed = generate_password_hash(_DEFAULT_PASSWORD)
         for user in _SEED_STAFF:
             c.execute('''
-                INSERT OR IGNORE INTO staff_users (email, name, password_hash)
-                VALUES (?, ?, ?)
+                INSERT OR IGNORE INTO staff_users (email, name, password_hash, role)
+                VALUES (?, ?, ?, 'admin')
             ''', (user['email'].lower().strip(), user['name'], hashed))
         conn.commit()
         print(f"  ⚠️  Seeded {len(_SEED_STAFF)} staff users with default password — change on first login")
@@ -483,11 +507,11 @@ def verify_staff_credentials(email, password):
 
 
 def set_staff_password(email, new_password):
-    """Set/update a staff user's password. Returns True if updated."""
+    """Set/update a staff user's password. Also clears must_change_password flag."""
     hashed = generate_password_hash(new_password)
     conn = get_connection()
     c = conn.cursor()
-    c.execute('UPDATE staff_users SET password_hash = ? WHERE email = ?',
+    c.execute('UPDATE staff_users SET password_hash = ?, must_change_password = 0 WHERE email = ?',
               (hashed, email.lower().strip()))
     updated = c.rowcount > 0
     conn.commit()
@@ -504,3 +528,88 @@ def update_last_login(email):
               (now, email.lower().strip()))
     conn.commit()
     conn.close()
+
+
+def get_all_staff_users():
+    """Return all staff users with full details (for admin page)."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT id, email, name, role, is_active, created_at, last_login_at FROM staff_users ORDER BY name')
+    rows = c.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_staff_role(email):
+    """Get role for a staff user. Returns 'admin' or 'user' (or None)."""
+    if not email:
+        return None
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT role FROM staff_users WHERE email = ? AND is_active = 1',
+              (email.lower().strip(),))
+    row = c.fetchone()
+    conn.close()
+    return row['role'] if row else None
+
+
+def set_staff_role(email, new_role):
+    """Set a staff user's role. Returns True if updated."""
+    if new_role not in ('admin', 'user'):
+        return False
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('UPDATE staff_users SET role = ? WHERE email = ?',
+              (new_role, email.lower().strip()))
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def create_staff_user(email, name, password=None):
+    """Create a new staff user. Returns the user dict or None if email already exists."""
+    password = password or _DEFAULT_PASSWORD
+    hashed = generate_password_hash(password)
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute('''
+            INSERT INTO staff_users (email, name, password_hash, must_change_password)
+            VALUES (?, ?, ?, 1)
+        ''', (email.lower().strip(), name.strip(), hashed))
+        conn.commit()
+        user_id = c.lastrowid
+        conn.close()
+        return {'id': user_id, 'email': email.lower().strip(), 'name': name.strip()}
+    except sqlite3.IntegrityError:
+        conn.close()
+        return None
+
+
+def toggle_staff_active(email):
+    """Toggle a staff user's active status. Returns new is_active value or None."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT is_active FROM staff_users WHERE email = ?', (email.lower().strip(),))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return None
+    new_status = 0 if row['is_active'] else 1
+    c.execute('UPDATE staff_users SET is_active = ? WHERE email = ?',
+              (new_status, email.lower().strip()))
+    conn.commit()
+    conn.close()
+    return new_status
+
+
+def must_change_password(email):
+    """Check if user must change password on login."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute('SELECT must_change_password FROM staff_users WHERE email = ?',
+              (email.lower().strip(),))
+    row = c.fetchone()
+    conn.close()
+    return bool(row and row['must_change_password'])

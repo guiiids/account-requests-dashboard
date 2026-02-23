@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+{% block page_title %}Manage Users{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px;">
+
+    <!-- Add User Card -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:1.5rem; margin-bottom:2rem;">
+        <h3 style="font-size:1rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+            <i class="ph ph-user-plus"></i> Add New User
+        </h3>
+        <div id="add-user-error" style="display:none; background:#fef2f2; color:#dc2626; padding:0.75rem 1rem; border-radius:8px; font-size:0.875rem; margin-bottom:1rem;"></div>
+        <div id="add-user-success" style="display:none; background:#f0fdf4; color:#16a34a; padding:0.75rem 1rem; border-radius:8px; font-size:0.875rem; margin-bottom:1rem;"></div>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:end;">
+            <div style="flex:1; min-width:200px;">
+                <label style="display:block; font-size:0.8rem; font-weight:500; color:#64748b; margin-bottom:0.35rem;">Full Name</label>
+                <input type="text" id="new-user-name" class="form-input" placeholder="e.g. Jane Doe">
+            </div>
+            <div style="flex:1; min-width:250px;">
+                <label style="display:block; font-size:0.8rem; font-weight:500; color:#64748b; margin-bottom:0.35rem;">Email Address</label>
+                <input type="email" id="new-user-email" class="form-input" placeholder="name@agilent.com">
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="createUser()" style="white-space:nowrap;">
+                    <i class="ph ph-plus"></i> Add User
+                </button>
+            </div>
+        </div>
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:0.75rem;">
+            <i class="ph ph-info"></i>
+            Temporary password: <code style="background:#f1f5f9; padding:0.15rem 0.4rem; border-radius:4px; font-weight:600;">{{ default_password }}</code>
+            — user will be prompted to change on first login.
+        </p>
+    </div>
+
+    <!-- Users Table -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+            <thead>
+                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                    <th style="text-align:left; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Name</th>
+                    <th style="text-align:left; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Email</th>
+                    <th style="text-align:left; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Role</th>
+                    <th style="text-align:left; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Status</th>
+                    <th style="text-align:left; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Last Login</th>
+                    <th style="text-align:right; padding:0.75rem 1rem; font-weight:600; color:#475569; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body">
+                {% for user in users %}
+                <tr id="user-row-{{ user.email }}" style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:0.75rem 1rem; font-weight:500;">{{ user.name }}</td>
+                    <td style="padding:0.75rem 1rem; color:#64748b;">{{ user.email }}</td>
+                    <td style="padding:0.75rem 1rem;">
+                        {% if user.role == 'admin' %}
+                        <span style="background:#dbeafe; color:#1d4ed8; padding:0.2rem 0.6rem; border-radius:20px; font-size:0.75rem; font-weight:600;">Admin</span>
+                        {% else %}
+                        <span style="background:#f1f5f9; color:#64748b; padding:0.2rem 0.6rem; border-radius:20px; font-size:0.75rem; font-weight:600;">User</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:0.75rem 1rem;">
+                        {% if user.is_active %}
+                        <span style="background:#dcfce7; color:#16a34a; padding:0.2rem 0.6rem; border-radius:20px; font-size:0.75rem; font-weight:600;">Active</span>
+                        {% else %}
+                        <span style="background:#fee2e2; color:#dc2626; padding:0.2rem 0.6rem; border-radius:20px; font-size:0.75rem; font-weight:600;">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:0.75rem 1rem; color:#94a3b8; font-size:0.85rem;">
+                        {{ user.last_login_at | format_datetime if user.last_login_at else 'Never' }}
+                    </td>
+                    <td style="padding:0.75rem 1rem; text-align:right; display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button onclick="toggleRole('{{ user.email }}', '{{ 'user' if user.role == 'admin' else 'admin' }}')"
+                                style="background:none; border:1px solid #e2e8f0; border-radius:6px; padding:0.35rem 0.75rem; cursor:pointer; font-size:0.8rem; color:#64748b; transition:all 0.15s;"
+                                onmouseover="this.style.borderColor='#7c3aed'; this.style.color='#7c3aed';"
+                                onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b';">
+                            {% if user.role == 'admin' %}
+                            <i class="ph ph-arrow-down"></i> Downgrade
+                            {% else %}
+                            <i class="ph ph-arrow-up"></i> Upgrade
+                            {% endif %}
+                        </button>
+                        <button onclick="toggleUser('{{ user.email }}')"
+                                style="background:none; border:1px solid #e2e8f0; border-radius:6px; padding:0.35rem 0.75rem; cursor:pointer; font-size:0.8rem; color:#64748b; transition:all 0.15s;"
+                                onmouseover="this.style.borderColor='#0085D5'; this.style.color='#0085D5';"
+                                onmouseout="this.style.borderColor='#e2e8f0'; this.style.color='#64748b';">
+                            {% if user.is_active %}
+                            <i class="ph ph-prohibit"></i> Deactivate
+                            {% else %}
+                            <i class="ph ph-check-circle"></i> Activate
+                            {% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+function createUser() {
+    const name = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const errBox = document.getElementById('add-user-error');
+    const succBox = document.getElementById('add-user-success');
+    errBox.style.display = 'none';
+    succBox.style.display = 'none';
+
+    if (!name || !email) {
+        errBox.textContent = 'Name and email are required.';
+        errBox.style.display = 'block';
+        return;
+    }
+
+    fetch('/other/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            succBox.textContent = `Created ${data.user.name} (${data.user.email}). They can log in with the temp password.`;
+            succBox.style.display = 'block';
+            document.getElementById('new-user-name').value = '';
+            document.getElementById('new-user-email').value = '';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            errBox.textContent = data.error || 'Failed to create user.';
+            errBox.style.display = 'block';
+        }
+    })
+    .catch(() => {
+        errBox.textContent = 'Network error. Please try again.';
+        errBox.style.display = 'block';
+    });
+}
+
+function toggleRole(email, newRole) {
+    if (!confirm(`Change ${email} to ${newRole}?`)) return;
+    fetch(`/other/api/users/${encodeURIComponent(email)}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert(data.error || 'Failed to change role.');
+    });
+}
+
+function toggleUser(email) {
+    fetch(`/other/api/users/${encodeURIComponent(email)}/toggle`, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to toggle user.');
+        }
+    });
+}
+</script>
+{% endblock %}

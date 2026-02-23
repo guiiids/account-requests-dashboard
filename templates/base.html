@@ -56,7 +56,7 @@
                 <div class="brand-wrapper">
                     <!-- Agilent/iLab Brand Placeholder -->
                     <i class="ph-fill ph-flask brand-icon"></i>
-                    <span>iLab Supportl</span>
+                    <span>iLab Support</span>
                 </div>
             </div>
 
@@ -79,10 +79,13 @@
                 </a>
 
                 <!-- Mock-up items for 'Evolved' feel -->
-                <a href="#" class="nav-item disabled" style="opacity: 0.5;">
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('manage_users') }}"
+                    class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
                     <i class="ph ph-users"></i>
                     <span>Users</span>
                 </a>
+                {% endif %}
                 <a href="#" class="nav-item disabled" style="opacity: 0.5;">
                     <i class="ph ph-chart-bar"></i>
                     <span>Reports</span>
@@ -96,7 +99,7 @@
                     </div>
                     <div class="user-info">
                         <span class="user-name">{{ current_user.name }}</span>
-                        <span class="user-role">Administrator</span>
+                        <span class="user-role">{{ current_user.role|capitalize }}</span>
                     </div>
                     <a href="#" onclick="event.preventDefault(); document.getElementById('pw-modal-overlay').classList.add('active');"
                        class="logout-btn" title="Change Password" style="margin-right: -0.25rem;">
