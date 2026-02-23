@@ -430,6 +430,8 @@ _SEED_STAFF = [
     {'email': 'nadia.clark@agilent.com', 'name': 'Nadia Clark'},
     {'email': 'william.lai@agilent.com', 'name': 'William Lai'},
     {'email': 'elvira.carrera@agilent.com', 'name': 'Elvira Carrera'},
+    {'email': 'vinod.rajendran@agilent.com', 'name': 'Vinod Rajendran'},
+    {'email': 'guilherme.vieira-machado@agilent.com', 'name': 'Guilherme Vieira-Machado'},
 ]
 
 _DEFAULT_PASSWORD = 'changeme123'
