@@ -293,6 +293,9 @@
                     newScript.textContent = oldScript.textContent;
                     oldScript.parentNode.replaceChild(newScript, oldScript);
                 });
+
+                // Convert UTC timestamps to local time in newly loaded content
+                if (typeof convertLocalTimes === 'function') convertLocalTimes(tab.contentEl);
             } catch (error) {
                 tab.contentEl.innerHTML = `
                     <div class="empty-state">

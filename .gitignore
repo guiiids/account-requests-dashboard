@@ -90,3 +90,4 @@ flask_session/
 *.orig
 Thumbs.db
 misc/
+.azure-temp-env-files/

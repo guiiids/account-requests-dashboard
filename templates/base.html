@@ -243,6 +243,38 @@
         });
     }
     </script>
+
+    <!-- Convert UTC timestamps to each user's local browser timezone -->
+    <script>
+    function convertLocalTimes(root) {
+        const container = root || document;
+        container.querySelectorAll('time.local-time[data-utc]').forEach(el => {
+            try {
+                const utc = new Date(el.dataset.utc);
+                if (isNaN(utc)) return;
+
+                // Date-only values (midnight UTC) → show date only
+                if (utc.getUTCHours() === 0 && utc.getUTCMinutes() === 0 && utc.getUTCSeconds() === 0) {
+                    el.textContent = utc.toLocaleDateString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    });
+                } else {
+                    // Full date + time in user's local timezone
+                    const datePart = utc.toLocaleDateString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                    });
+                    const timePart = utc.toLocaleTimeString(undefined, {
+                        hour: 'numeric', minute: '2-digit', hour12: true
+                    });
+                    el.textContent = `${datePart} at ${timePart}`;
+                }
+                // Mark as converted so we don't re-process
+                el.removeAttribute('data-utc');
+            } catch (e) { /* keep server fallback */ }
+        });
+    }
+    document.addEventListener('DOMContentLoaded', () => convertLocalTimes());
+    </script>
 </body>
 
 </html>

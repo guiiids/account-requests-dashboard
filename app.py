@@ -100,7 +100,11 @@ def inject_user():
 
 @app.template_filter('format_datetime')
 def format_datetime(value, fmt='friendly'):
-    """Format a date string or datetime object into a human-friendly local time."""
+    """Format a date string or datetime object into a human-friendly local time.
+
+    Outputs a <time> element with a data-utc attribute so client-side JS can
+    convert the displayed text to each user's browser-local timezone.
+    """
     if not value:
         return ''
     date_obj = None
@@ -124,11 +128,19 @@ def format_datetime(value, fmt='friendly'):
     else:
         date_obj = value
 
-    # Human-friendly format: "Feb 19, 2026 at 9:47 PM"
-    # For date-only values (midnight), omit the time portion
+    # Build ISO string for client-side conversion (treated as UTC)
+    iso_str = date_obj.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+
+    # Server-side fallback text
     if date_obj.hour == 0 and date_obj.minute == 0 and date_obj.second == 0:
-        return date_obj.strftime('%b %-d, %Y')
-    return date_obj.strftime('%b %-d, %Y at %-I:%M %p')
+        fallback = date_obj.strftime('%b %-d, %Y')
+    else:
+        fallback = date_obj.strftime('%b %-d, %Y at %-I:%M %p')
+
+    from markupsafe import Markup
+    return Markup(
+        f'<time class="local-time" data-utc="{iso_str}">{fallback}</time>'
+    )
 
 
 @app.template_filter('get_initials')
