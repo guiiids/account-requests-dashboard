@@ -1,0 +1,10 @@
+.venv
+.git
+.env
+__pycache__
+*.pyc
+*.db
+.DS_Store
+docker-compose.yml
+CLAUDE.md
+README.md

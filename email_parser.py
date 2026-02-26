@@ -123,7 +123,13 @@ def strip_html(text: str) -> str:
     }
     for entity, char in entities.items():
         text = text.replace(entity, char)
-    
+
+    # Strip corporate "External Sender" warning banner injected by mail gateway
+    text = re.sub(
+        r'External Sender\s*[-–—]\s*Use caution opening files,?\s*clicking links,?\s*or responding to requests\.?',
+        '', text, flags=re.IGNORECASE
+    )
+
     # Collapse multiple blank lines
     text = re.sub(r'\n\s*\n+', '\n\n', text)
     

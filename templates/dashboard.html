@@ -109,7 +109,7 @@
                     <thead>
                         <tr>
                             <th style="width: 120px;">Reference</th>
-                            <th>Requester</th>
+                            <th>Subject</th>
                             <th>Status</th>
                             <th>Owner</th>
                             <th>Date</th>
@@ -128,9 +128,9 @@
                                         else '?'
                                         }}</div>
                                     <div class="user-text">
-                                        <div class="user-name">{{ req.requester_name or 'Unknown' }}</div>
+                                        <div class="user-name">{{ req.original_subject or 'Account Request' }}</div>
                                         <div class="user-sub">
-                                            {{ req.requester_email }}
+                                            {{ req.requester_name or req.requester_email }}
                                             {% if req.organization %}
                                             <span style="margin-left: 0.5rem; font-weight: 500;">
                                                 {{ req.organization }}
