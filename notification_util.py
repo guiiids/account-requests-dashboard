@@ -17,22 +17,10 @@ logger = logging.getLogger(__name__)
 
 # Disable SSL warnings for local dev (corporate proxy issues)
 def _get_ssl_verify():
-    """Returns False for local dev to bypass corporate proxy SSL issues."""
-    # Check multiple sources for local environment detection
+    """Returns False only when explicitly running in a local/dev environment."""
     env = os.environ.get('FLASK_ENV', '').lower()
     ragka_env = os.environ.get('RAGKA_ENV', '').lower()
-    website_hostname = os.environ.get('WEBSITE_HOSTNAME', '')
-    
-    # Is local if:
-    # 1. FLASK_ENV is development/local
-    # 2. RAGKA_ENV is local/dev
-    # 3. No WEBSITE_HOSTNAME (not in Azure)
-    is_local = (
-        env in ('development', 'local') or 
-        ragka_env in ('local', 'dev', 'development') or
-        not website_hostname  # No Azure hostname = local dev
-    )
-    
+    is_local = env in ('development', 'local') or ragka_env in ('local', 'dev', 'development')
     if is_local:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         logger.debug("SSL verification disabled for local development")

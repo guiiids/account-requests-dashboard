@@ -130,29 +130,31 @@ def get_audit_log(
         Maximum number of rows to return.  Defaults to 200.
     """
     conn = database.get_connection()
-    c = conn.cursor()
+    try:
+        c = conn.cursor()
 
-    query = "SELECT * FROM audit_log WHERE 1=1"
-    params: list = []
+        query = "SELECT * FROM audit_log WHERE 1=1"
+        params: list = []
 
-    if actor_email:
-        query += " AND actor_email = ?"
-        params.append(actor_email.lower().strip())
+        if actor_email:
+            query += " AND actor_email = ?"
+            params.append(actor_email.lower().strip())
 
-    if target_id:
-        query += " AND target_id = ?"
-        params.append(target_id.upper().strip())
+        if target_id:
+            query += " AND target_id = ?"
+            params.append(target_id.upper().strip())
 
-    if action_prefix:
-        query += " AND action LIKE ?"
-        params.append(action_prefix + "%")
+        if action_prefix:
+            query += " AND action LIKE ?"
+            params.append(action_prefix + "%")
 
-    query += " ORDER BY id DESC LIMIT ?"
-    params.append(limit)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
 
-    c.execute(query, params)
-    rows = c.fetchall()
-    conn.close()
+        c.execute(query, params)
+        rows = c.fetchall()
+    finally:
+        conn.close()
 
     entries = []
     for row in rows:

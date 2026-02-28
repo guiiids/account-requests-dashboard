@@ -91,3 +91,4 @@ flask_session/
 Thumbs.db
 misc/
 .azure-temp-env-files/
+admin_docs/

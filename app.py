@@ -8,6 +8,7 @@ import audit
 import email_parser
 import notification_util
 import os
+import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
@@ -21,7 +22,18 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 
 # =============================================================================
@@ -50,6 +62,17 @@ def _record_failed_attempt(email):
 def _clear_login_attempts(email):
     """Clear attempts after successful login."""
     _LOGIN_ATTEMPTS.pop(email, None)
+
+
+def _validate_password(pw):
+    """Return an error string if pw fails complexity rules, else None."""
+    if len(pw) < 8:
+        return 'Password must be at least 8 characters.'
+    if not any(c.isupper() for c in pw):
+        return 'Password must contain at least one uppercase letter.'
+    if not any(c.isdigit() for c in pw):
+        return 'Password must contain at least one number.'
+    return None
 
 
 # =============================================================================
@@ -258,9 +281,8 @@ def force_change_password():
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
 
-        if len(new_password) < 8:
-            error = 'Password must be at least 8 characters.'
-        elif new_password != confirm_password:
+        error = _validate_password(new_password)
+        if not error and new_password != confirm_password:
             error = 'Passwords do not match.'
         else:
             database.set_staff_password(user['email'], new_password)
@@ -457,9 +479,10 @@ def api_change_password():
     if not database.verify_staff_credentials(user['email'], current_password):
         return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
 
-    # Enforce minimum length
-    if len(new_password) < 8:
-        return jsonify({'success': False, 'error': 'New password must be at least 8 characters'}), 400
+    # Enforce password complexity
+    pw_error = _validate_password(new_password)
+    if pw_error:
+        return jsonify({'success': False, 'error': pw_error}), 400
 
     # Set new password
     success = database.set_staff_password(user['email'], new_password)
@@ -706,7 +729,7 @@ def webhook_new_request():
     # Simple API key auth (optional)
     api_key = request.headers.get('X-API-Key')
     expected_key = os.environ.get('WEBHOOK_API_KEY')
-    if expected_key and api_key != expected_key:
+    if expected_key and not secrets.compare_digest(api_key or '', expected_key):
         return jsonify({'error': 'Unauthorized'}), 401
 
     data = request.get_json() or {}
@@ -837,7 +860,7 @@ def import_request():
 # =============================================================================
 
 @app.route('/other/audit')
-@staff_required
+@admin_required
 def audit_log_viewer():
     """
     Cross-request audit log viewer for staff.
@@ -896,4 +919,5 @@ if __name__ == '__main__':
         print('\n  ⚠️  WARNING: Using default secret key. Set FLASK_SECRET_KEY in .env for production.\n')
 
     database.init_db()
-    app.run(debug=True, port=5006)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_mode, port=5006)

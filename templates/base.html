@@ -72,24 +72,23 @@
                     <span>Import Data</span>
                 </a>
 
+                {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('audit_log_viewer') }}"
                     class="nav-item {% if request.endpoint == 'audit_log_viewer' %}active{% endif %}">
                     <i class="ph ph-shield-check"></i>
                     <span>Audit Log</span>
                 </a>
 
-                <!-- Mock-up items for 'Evolved' feel -->
-                {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('manage_users') }}"
                     class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
                     <i class="ph ph-users"></i>
                     <span>Users</span>
                 </a>
-                {% endif %}
                 <a href="#" class="nav-item disabled" style="opacity: 0.5;">
                     <i class="ph ph-chart-bar"></i>
                     <span>Reports</span>
                 </a>
+                {% endif %}
             </nav>
 
             <div class="sidebar-footer">
