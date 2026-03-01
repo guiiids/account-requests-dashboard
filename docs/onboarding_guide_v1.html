@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iLab Account Requests Dashboard — Onboarding Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@200;400;500&family=Roboto+Condensed&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root {
+    --primary-blue: #0085d5;
+    --dark-blue: #00426a;
+    --medium-blue: #2281c4;
+    --green: #3c7356;
+    --teal: #0f766e;
+    --amber: #d97706;
+    --indigo: #4f46e5;
+    --white: #ffffff;
+    --dark-gray: #202020;
+    --secondary-text: #888b8d;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f4f3f1;
+    --bg-light-gray: #efefef;
+    --border-color: #d0d0ce;
+    --sidebar-width: 280px;
+    --header-height: 56px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  body {
+    font-family: 'Roboto', Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--dark-gray);
+    background: var(--bg-secondary);
+  }
+  .site-header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--header-height);
+    background: var(--dark-blue);
+    display: flex; align-items: center;
+    padding: 0 24px; z-index: 100; gap: 16px;
+  }
+  .site-header .logo {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--white); text-decoration: none;
+  }
+  .site-header .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--primary-blue); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Roboto Condensed', sans-serif;
+    font-size: 18px; font-weight: 500; color: white;
+  }
+  .site-header .logo-text {
+    font-weight: 500; font-size: 16px; letter-spacing: 0.02em;
+  }
+  .site-header .header-divider {
+    width: 1px; height: 24px; background: rgba(255,255,255,0.2);
+  }
+  .site-header .header-title {
+    color: rgba(255,255,255,0.85); font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .hamburger {
+    display: none; background: none; border: none;
+    cursor: pointer; padding: 4px; color: white;
+  }
+  .hamburger svg { display: block; }
+  .sidebar {
+    position: fixed; top: var(--header-height); left: 0; bottom: 0;
+    width: var(--sidebar-width); background: var(--white);
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto; z-index: 90; padding: 20px 0;
+    transition: transform 0.3s ease;
+  }
+  .sidebar-section-label {
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    color: var(--secondary-text); letter-spacing: 0.08em;
+    padding: 12px 20px 6px;
+  }
+  .sidebar a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 20px; color: var(--dark-gray);
+    text-decoration: none; font-size: 13px; line-height: 18px;
+    border-left: 3px solid transparent; transition: all 0.15s ease;
+  }
+  .sidebar a:hover { background: var(--bg-secondary); color: var(--primary-blue); }
+  .sidebar a.active {
+    border-left-color: var(--primary-blue); color: var(--primary-blue);
+    background: #eff8ff; font-weight: 500;
+  }
+  .sidebar a .nav-icon {
+    width: 18px; text-align: center; flex-shrink: 0;
+    font-size: 16px; display: inline-flex;
+    align-items: center; justify-content: center;
+  }
+  .sidebar-footer {
+    padding: 16px 20px; border-top: 1px solid var(--border-color); margin-top: 12px;
+  }
+  .sidebar-footer p { font-size: 11px; color: var(--secondary-text); line-height: 1.5; }
+  .main {
+    margin-left: var(--sidebar-width); margin-top: var(--header-height);
+    padding: 32px 40px 80px; max-width: 960px;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--dark-blue) 0%, var(--primary-blue) 100%);
+    border-radius: 6px; padding: 48px 40px; margin-bottom: 32px; color: var(--white);
+  }
+  .hero h1 { font-weight: 500; font-size: 28px; line-height: 1.3; margin-bottom: 8px; }
+  .hero .hero-sub { font-size: 14px; opacity: 0.85; }
+  .hero .meta-pills { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+  .hero .meta-pill {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 4px 14px; font-size: 12px;
+    color: rgba(255,255,255,0.9); display: inline-flex; align-items: center; gap: 6px;
+  }
+  .hero .meta-pill i { font-size: 14px; }
+  .section {
+    background: var(--white); border-radius: 4px;
+    padding: 32px; margin-bottom: 24px; border: 1px solid var(--border-color);
+  }
+  .section h2 {
+    font-weight: 500; font-size: 20px; color: var(--dark-blue);
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-blue);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section h2 .step-num {
+    background: var(--primary-blue); color: white;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500; flex-shrink: 0;
+  }
+  .section h2 > i { font-size: 22px; color: var(--primary-blue); }
+  .section h3 { font-weight: 500; font-size: 16px; margin: 24px 0 10px; }
+  .section p { margin-bottom: 12px; line-height: 1.7; }
+  .section ul, .section ol { margin: 0 0 12px 20px; }
+  .section li { margin-bottom: 6px; line-height: 1.6; }
+  .data-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  .data-table th {
+    background: transparent; color: var(--secondary-text); text-align: left;
+    padding: 8px 16px 8px 0; border-bottom: 2px solid var(--border-color);
+    font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .data-table td {
+    padding: 10px 16px 10px 0; border-bottom: 1px solid #eee;
+    vertical-align: top; line-height: 1.5;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table code {
+    font-family: 'Roboto Mono', monospace; font-size: 12px;
+    background: var(--bg-light-gray); padding: 2px 6px;
+    border-radius: 3px; color: var(--dark-blue);
+  }
+  .callout {
+    padding: 14px 16px; border-radius: 4px; margin: 16px 0;
+    font-size: 13px; line-height: 1.6; display: flex; gap: 10px;
+  }
+  .callout .callout-icon {
+    flex-shrink: 0; font-size: 18px; margin-top: 1px;
+    display: inline-flex; align-items: flex-start;
+  }
+  .callout-tip { background: #eff8ff; border-left: 3px solid var(--primary-blue); }
+  .callout-tip .callout-icon { color: var(--primary-blue); }
+  .callout-warn { background: #fffbeb; border-left: 3px solid var(--amber); }
+  .callout-warn .callout-icon { color: var(--amber); }
+  .callout-info { background: #ecfdf5; border-left: 3px solid var(--green); }
+  .callout-info .callout-icon { color: var(--green); }
+  .callout-important { background: #eef2ff; border-left: 3px solid var(--indigo); }
+  .callout-important .callout-icon { color: var(--indigo); }
+  .callout strong { font-weight: 500; }
+  .flow {
+    display: flex; align-items: center; gap: 0;
+    padding: 20px 0; overflow-x: auto; margin: 16px 0;
+  }
+  .flow-step {
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 14px 16px; min-width: 140px;
+    text-align: center; font-size: 12px; line-height: 1.5; flex-shrink: 0;
+  }
+  .flow-step .flow-icon {
+    font-size: 24px; display: flex; justify-content: center;
+    margin-bottom: 6px; color: var(--primary-blue);
+  }
+  .flow-step strong { display: block; font-weight: 500; font-size: 12px; }
+  .flow-step span:not(.flow-icon) { color: var(--secondary-text); font-size: 11px; }
+  .flow-arrow {
+    color: var(--primary-blue); font-size: 20px; flex-shrink: 0;
+    padding: 0 4px; display: inline-flex; align-items: center;
+  }
+  .flow-vertical {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0; padding: 20px 0; margin: 16px 0;
+  }
+  .flow-vertical .flow-step { width: 340px; max-width: 100%; }
+  .flow-vertical .flow-arrow { transform: rotate(90deg); padding: 6px 0; }
+  .metrics-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin: 16px 0;
+  }
+  .metric-card { padding: 16px; border-radius: 6px; border: 1px solid; text-align: center; }
+  .metric-card .metric-icon {
+    font-size: 26px; margin-bottom: 6px;
+    display: flex; justify-content: center;
+  }
+  .metric-card .metric-label { font-size: 13px; font-weight: 500; }
+  .metric-card .metric-desc { font-size: 11px; color: var(--secondary-text); margin-top: 4px; }
+  .mc-blue { background: #eff6ff; border-color: #3b82f6; }
+  .mc-blue .metric-icon { color: #3b82f6; }
+  .mc-indigo { background: #eef2ff; border-color: #6366f1; }
+  .mc-indigo .metric-icon { color: #6366f1; }
+  .mc-amber { background: #fffbeb; border-color: #f59e0b; }
+  .mc-amber .metric-icon { color: #f59e0b; }
+  .mc-green { background: #ecfdf5; border-color: #10b981; }
+  .mc-green .metric-icon { color: #10b981; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 500; padding: 3px 10px;
+    border-radius: 12px; white-space: nowrap;
+  }
+  .badge-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-blue .badge-dot { background: #3b82f6; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-amber .badge-dot { background: #f59e0b; }
+  .badge-green { background: #d1fae5; color: #065f46; }
+  .badge-green .badge-dot { background: #10b981; }
+  .badge-purple { background: #ede9fe; color: #5b21b6; }
+  .badge-purple .badge-dot { background: #8b5cf6; }
+  .badge-slate { background: #f1f5f9; color: #475569; }
+  .badge-slate .badge-dot { background: #94a3b8; }
+  .badge-teal { background: #ccfbf1; color: #115e59; }
+  .badge-teal .badge-dot { background: #14b8a6; }
+  .badge-orange { background: #ffedd5; color: #9a3412; }
+  .badge-orange .badge-dot { background: #f97316; }
+  kbd {
+    font-family: 'Roboto Mono', monospace; font-size: 11px;
+    background: var(--bg-light-gray); border: 1px solid var(--border-color);
+    border-radius: 3px; padding: 2px 6px; box-shadow: 0 1px 0 rgba(0,0,0,0.1);
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 16px 0; }
+  .two-col-item h4 { font-weight: 500; font-size: 14px; color: var(--dark-blue); margin-bottom: 8px; }
+  .nav-diagram {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin: 16px 0;
+  }
+  .nav-node {
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 14px; text-align: center;
+    font-size: 12px; font-weight: 500; transition: border-color 0.15s;
+  }
+  .nav-node:hover { border-color: var(--primary-blue); }
+  .nav-node .nav-node-icon {
+    font-size: 24px; display: flex; justify-content: center;
+    margin-bottom: 6px; color: var(--primary-blue);
+  }
+  .nav-node-primary { background: var(--dark-blue); color: white; border-color: var(--dark-blue); }
+  .nav-node-primary .nav-node-icon { color: white; }
+  .nav-node-sub { background: #eff8ff; border-color: var(--primary-blue); }
+  .glossary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .glossary-item { padding: 12px 14px; background: var(--bg-secondary); border-radius: 4px; }
+  .glossary-item dt { font-weight: 500; font-size: 13px; color: var(--dark-blue); margin-bottom: 2px; }
+  .glossary-item dd { font-size: 12px; color: var(--secondary-text); line-height: 1.5; }
+  .back-to-top {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 40px; height: 40px; background: var(--primary-blue);
+    color: white; border: none; border-radius: 50%;
+    cursor: pointer; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.3s; z-index: 80;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .back-to-top.visible { opacity: 1; }
+  @media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.15); }
+    .main { margin-left: 0; padding: 24px 16px 60px; }
+    .hamburger { display: block; }
+    .metrics-row { grid-template-columns: 1fr 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .glossary-grid { grid-template-columns: 1fr; }
+    .hero { padding: 32px 24px; }
+    .hero h1 { font-size: 22px; }
+    .section { padding: 24px 20px; }
+  }
+  @media (max-width: 520px) {
+    .metrics-row { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')" aria-label="Toggle menu">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h16M3 11h16M3 16h16"/></svg>
+  </button>
+  <a href="#" class="logo">
+    <div class="logo-icon">iL</div>
+    <span class="logo-text">iLab Support</span>
+  </a>
+  <div class="header-divider"></div>
+  <span class="header-title">Onboarding Guide</span>
+</header>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-section-label">Getting Started</div>
+  <a href="#how-it-works"><span class="nav-icon"><i class="ph ph-gear"></i></span> How the System Works</a>
+  <a href="#step-1"><span class="nav-icon"><i class="ph ph-sign-in"></i></span> Logging In</a>
+  <a href="#step-2"><span class="nav-icon"><i class="ph ph-layout"></i></span> The Dashboard</a>
+  <a href="#step-3"><span class="nav-icon"><i class="ph ph-chart-bar"></i></span> Metrics Cards</a>
+  <div class="sidebar-section-label">Working Tickets</div>
+  <a href="#step-4"><span class="nav-icon"><i class="ph ph-tabs"></i></span> Opening a Request</a>
+  <a href="#step-5"><span class="nav-icon"><i class="ph ph-wrench"></i></span> Working a Ticket</a>
+  <a href="#step-6"><span class="nav-icon"><i class="ph ph-chat-circle-text"></i></span> Communicating</a>
+  <a href="#step-7"><span class="nav-icon"><i class="ph ph-check-circle"></i></span> Closing a Ticket</a>
+  <div class="sidebar-section-label">Reference</div>
+  <a href="#step-8"><span class="nav-icon"><i class="ph ph-shield-check"></i></span> Audit Log</a>
+  <a href="#navigation"><span class="nav-icon"><i class="ph ph-compass"></i></span> Navigation Map</a>
+  <a href="#shortcuts"><span class="nav-icon"><i class="ph ph-keyboard"></i></span> Keyboard Shortcuts</a>
+  <a href="#glossary"><span class="nav-icon"><i class="ph ph-book-open"></i></span> Glossary</a>
+  <div class="sidebar-footer">
+    <p><strong>Audience:</strong> New support staff &amp; administrators</p>
+    <p>Last Updated: February 2026</p>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="hero">
+    <h1>iLab Account Requests Dashboard</h1>
+    <p class="hero-sub">Onboarding Guide for Support Staff &amp; Administrators</p>
+    <div class="meta-pills">
+      <span class="meta-pill"><i class="ph ph-file-text"></i> Onboarding Guide</span>
+      <span class="meta-pill"><i class="ph ph-users"></i> New Staff &amp; Admins</span>
+      <span class="meta-pill"><i class="ph ph-clock"></i> Updated Feb 2026</span>
+    </div>
+  </div>
+
+  <div class="section" id="how-it-works">
+    <h2><i class="ph ph-gear"></i> How the System Works</h2>
+    <p>The iLab Account Requests Dashboard is an internal tool that replaces manual email tracking for iLab signup requests. Here's the big picture:</p>
+    <div class="flow">
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-envelope-simple"></i></span><strong>Email arrives</strong><span>iLab signup request</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-right"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-lightning"></i></span><strong>Power Automate</strong><span>Webhook fires</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-right"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-tray-arrow-down"></i></span><strong>Dashboard ingests</strong><span>Creates ticket</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-right"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-user"></i></span><strong>Agent picks up</strong><span>Ticket from queue</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-right"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-chat-dots"></i></span><strong>Agent works ticket</strong><span>Notes, emails, status</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-right"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-check-circle"></i></span><strong>Ticket closed</strong><span>When resolved</span></div>
+    </div>
+    <h3>Key Concepts</h3>
+    <ul>
+      <li><strong>Requests</strong> arrive automatically from a shared mailbox via Power Automate.</li>
+      <li><strong>Smart Threading</strong> groups email replies with the original request using Outlook Conversation IDs.</li>
+      <li><strong>Tabbed Interface</strong> lets you work multiple requests simultaneously — like browser tabs.</li>
+      <li><strong>Every action is audited</strong> — status changes, emails sent, notes added, and logins.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="step-1">
+    <h2><span class="step-num">1</span> Logging In</h2>
+    <p>Navigate to the dashboard URL and you'll see the login screen.</p>
+    <table class="data-table">
+      <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Email Address</strong></td><td>Your <code>@agilent.com</code> email</td></tr>
+        <tr><td><strong>Password</strong></td><td>Your assigned password</td></tr>
+        <tr><td><strong>Remember me</strong></td><td>Check to stay signed in across browser sessions</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-tip">
+      <span class="callout-icon"><i class="ph ph-lightbulb"></i></span>
+      <div><strong>First Login:</strong> If this is your first time logging in, you'll be asked to change your password immediately. Choose something at least 8 characters long.</div>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-icon"><i class="ph ph-warning"></i></span>
+      <div><strong>Lockout Protection:</strong> After 5 failed login attempts, your account is temporarily locked for 15 minutes. Wait and try again or contact an admin.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-2">
+    <h2><span class="step-num">2</span> The Dashboard (Home Base)</h2>
+    <p>After logging in, you land on the <strong>Dashboard</strong> — your command center for all account requests. The interface has three main zones:</p>
+    <h3>The Sidebar (Left)</h3>
+    <p>Your navigation hub. It stays visible on every page.</p>
+    <table class="data-table">
+      <thead><tr><th>Nav Item</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Overview</strong></td><td>Main dashboard with request queue (you are here)</td></tr>
+        <tr><td><strong>Import Data</strong></td><td>Manually paste email content to create a request</td></tr>
+        <tr><td><strong>Audit Log</strong></td><td>View a read-only record of all agent actions</td></tr>
+        <tr><td><strong>Users</strong></td><td>Manage staff accounts <em>(Admin only)</em></td></tr>
+      </tbody>
+    </table>
+    <p>At the bottom of the sidebar you'll see your <strong>name</strong>, <strong>role</strong> (Admin or User), a lock icon to change your password, and a sign-out button.</p>
+    <h3>The Request Queue (Table)</h3>
+    <p>The main table listing all requests. Each row shows:</p>
+    <table class="data-table">
+      <thead><tr><th>Column</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Reference</strong></td><td>Unique ticket ID (e.g., <code>ACCT-001</code>) in blue monospace</td></tr>
+        <tr><td><strong>Subject</strong></td><td>Email subject line with requester's name and organization nested below</td></tr>
+        <tr><td><strong>Status</strong></td><td><code>New</code>, <code>Waiting</code>, or <code>Closed</code> variants — color-coded badge</td></tr>
+        <tr><td><strong>Owner</strong></td><td>Which agent is assigned (or <code>—</code> if unassigned)</td></tr>
+        <tr><td><strong>Date</strong></td><td>When the request was created</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-tip">
+      <span class="callout-icon"><i class="ph ph-magnifying-glass"></i></span>
+      <div><strong>Searching:</strong> Use the search bar in the table header to filter requests by keyword. Searches across subject, requester name, email, and organization.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-3">
+    <h2><span class="step-num">3</span> Understanding the Metrics Cards</h2>
+    <p>The four cards at the top of the dashboard are <strong>interactive filters</strong> and <strong>real-time gauges</strong>.</p>
+    <div class="metrics-row">
+      <div class="metric-card mc-blue">
+        <div class="metric-icon"><i class="ph ph-folder-open"></i></div>
+        <div class="metric-label">Total Requests</div>
+        <div class="metric-desc">Lifetime count — all time</div>
+      </div>
+      <div class="metric-card mc-indigo">
+        <div class="metric-icon"><i class="ph ph-envelope-open"></i></div>
+        <div class="metric-label">Open</div>
+        <div class="metric-desc">Needs Action</div>
+      </div>
+      <div class="metric-card mc-amber">
+        <div class="metric-icon"><i class="ph ph-hourglass-medium"></i></div>
+        <div class="metric-label">In Progress</div>
+        <div class="metric-desc">Currently Processing</div>
+      </div>
+      <div class="metric-card mc-green">
+        <div class="metric-icon"><i class="ph ph-check-circle"></i></div>
+        <div class="metric-label">Closed</div>
+        <div class="metric-desc">Completed</div>
+      </div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Card</th><th>Color</th><th>Meaning</th><th>What to watch</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Total Requests</strong></td><td>Blue</td><td>Lifetime count of all requests ever created</td><td>General volume indicator</td></tr>
+        <tr><td><strong>Open</strong></td><td>Indigo</td><td>Requests awaiting initial triage</td><td>High number means requests need attention</td></tr>
+        <tr><td><strong>In Progress</strong></td><td>Amber</td><td>Actively being worked on</td><td>Shows current team workload</td></tr>
+        <tr><td><strong>Closed</strong></td><td>Green</td><td>Successfully resolved</td><td>Healthy ratio: most requests should end up here</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-tip">
+      <span class="callout-icon"><i class="ph ph-cursor-click"></i></span>
+      <div><strong>Filter by clicking:</strong> Click any card to filter the table below. The active card gets a blue left border. Click <strong>Total Requests</strong> to clear the filter.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-4">
+    <h2><span class="step-num">4</span> Opening a Request (Tabbed Detail View)</h2>
+    <p>Click any row in the request table to open it in a <strong>new tab</strong> — just like browser tabs, but within the dashboard itself. The detail view is split into two columns:</p>
+    <div class="two-col">
+      <div class="two-col-item">
+        <h4>Left Column — Activity Stream</h4>
+        <p>The conversation history, shown newest-first. Each message is a card showing:</p>
+        <ul>
+          <li><strong>Avatar</strong> with initials (blue = Agent, gray = Requester, light = System)</li>
+          <li><strong>Role badge</strong> — Support, Requester, or System</li>
+          <li><strong>Timestamp</strong> — auto-converted to local timezone</li>
+          <li><strong>Message body</strong> — full email or note content</li>
+        </ul>
+        <p><strong>Activity Filters:</strong> Click the funnel icon to toggle filter buttons — All, System, Agent, Customer.</p>
+        <p><strong>Audit Log Toggle:</strong> Click the clock icon to switch to a compact monospace audit-log-style table.</p>
+      </div>
+      <div class="two-col-item">
+        <h4>Right Column — Metadata Sidebar</h4>
+        <table class="data-table">
+          <thead><tr><th>Section</th><th>Shows</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Header</strong></td><td>Ticket ID and subject line</td></tr>
+            <tr><td><strong>Details</strong></td><td>Request type, creation date, iLab link</td></tr>
+            <tr><td><strong>Status & Owner</strong></td><td>Dropdown selectors</td></tr>
+            <tr><td><strong>Requester</strong></td><td>Name, email, organization, lab</td></tr>
+            <tr><td><strong>Quick Actions</strong></td><td>Reply via Email &amp; Close/Reopen buttons</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <h3>Bottom — Inline Note Composer</h3>
+    <p>A sticky textarea at the bottom of the Activity Stream. Type your internal note and click the blue send button. These notes are <strong>internal only</strong> — they are NOT emailed to the requester.</p>
+  </div>
+
+  <div class="section" id="step-5">
+    <h2><span class="step-num">5</span> Working a Ticket</h2>
+    <p>Once you've opened a request, here's the typical workflow:</p>
+    <div class="flow-vertical">
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-envelope-simple"></i></span><strong>New request arrives</strong><span>Status: New - Open</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-down"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-user-circle"></i></span><strong>Assign to yourself</strong><span>Set assignee in sidebar</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-down"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-arrows-clockwise"></i></span><strong>Change status</strong><span>→ "Waiting - for Support"</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-down"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-question"></i></span><strong>Need more info?</strong><span>Reply via Email or process in iLab</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-down"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-note-pencil"></i></span><strong>Add internal note</strong><span>Document the resolution</span></div>
+      <div class="flow-arrow"><i class="ph ph-arrow-down"></i></div>
+      <div class="flow-step"><span class="flow-icon"><i class="ph ph-check-circle"></i></span><strong>Close ticket</strong><span>Mark as resolved</span></div>
+    </div>
+    <h3>Changing Status</h3>
+    <p>Click the <strong>Status</strong> dropdown in the sidebar. Options:</p>
+    <table class="data-table">
+      <thead><tr><th>Status</th><th>Badge</th><th>When to use</th></tr></thead>
+      <tbody>
+        <tr><td>New - Open</td><td><span class="badge badge-blue"><span class="badge-dot"></span>New</span></td><td>Default state for untouched requests</td></tr>
+        <tr><td>Waiting - for Support</td><td><span class="badge badge-amber"><span class="badge-dot"></span>Waiting</span></td><td>Triaged, awaiting agent action</td></tr>
+        <tr><td>Waiting - Information needed</td><td><span class="badge badge-amber"><span class="badge-dot"></span>Waiting</span></td><td>Asked requester for more details</td></tr>
+        <tr><td>Waiting - Approval needed</td><td><span class="badge badge-amber"><span class="badge-dot"></span>Waiting</span></td><td>Awaiting internal or institutional approval</td></tr>
+        <tr><td>Waiting - Answered</td><td><span class="badge badge-amber"><span class="badge-dot"></span>Waiting</span></td><td>Requester replied, awaiting your review</td></tr>
+        <tr><td>Waiting - Institution clarification</td><td><span class="badge badge-amber"><span class="badge-dot"></span>Waiting</span></td><td>Awaiting confirmation from parent institution</td></tr>
+        <tr><td>Closed - Resolved</td><td><span class="badge badge-green"><span class="badge-dot"></span>Closed</span></td><td>Successfully completed</td></tr>
+        <tr><td>Closed - Customer unresponsive</td><td><span class="badge badge-green"><span class="badge-dot"></span>Closed</span></td><td>Requester did not reply</td></tr>
+        <tr><td>Closed - Other</td><td><span class="badge badge-green"><span class="badge-dot"></span>Closed</span></td><td>Other reasons</td></tr>
+      </tbody>
+    </table>
+    <h3>Assigning a Ticket</h3>
+    <p>Click the <strong>Assignee</strong> dropdown in the sidebar to assign the ticket to yourself or another agent. This shows all active staff members.</p>
+    <h3>Adding Internal Notes</h3>
+    <ol>
+      <li>Type your note in the text area at the bottom of the Activity Stream</li>
+      <li>Click the blue send button (<i class="ph ph-paper-plane-tilt"></i>)</li>
+      <li>The note appears immediately in the activity stream</li>
+    </ol>
+    <div class="callout callout-important">
+      <span class="callout-icon"><i class="ph ph-info"></i></span>
+      <div><strong>Internal notes are not visible to requesters.</strong> They're for your team's internal communication only.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-6">
+    <h2><span class="step-num">6</span> Communicating with the Requester</h2>
+    <p>To send an email to the requester, click the <strong>Reply via Email</strong> button in the sidebar. This opens the email compose modal.</p>
+    <table class="data-table">
+      <thead><tr><th>Field</th><th>How to use</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Recipients</strong></td><td>Requester's email is suggested — click to add. Type additional emails and press Enter or click "Add"</td></tr>
+        <tr><td><strong>Subject</strong></td><td>Pre-filled with the request reference. Edit as needed</td></tr>
+        <tr><td><strong>Message</strong></td><td>Write your response. Sent via the system's SMTP relay</td></tr>
+      </tbody>
+    </table>
+    <p>Click <strong>Send Email</strong> to dispatch. The email appears in the Activity Stream and is recorded in the Audit Log.</p>
+    <div class="callout callout-tip">
+      <span class="callout-icon"><i class="ph ph-lightbulb"></i></span>
+      <div><strong>Reply threading:</strong> When the requester replies to your email, their response is automatically threaded back into the same ticket via the Outlook Conversation ID. No manual re-linking needed.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-7">
+    <h2><span class="step-num">7</span> Closing a Ticket</h2>
+    <p>When a request is fully resolved:</p>
+    <ol>
+      <li><strong>Add a final note</strong> explaining what was done (for audit trail purposes)</li>
+      <li>Click <strong>Close Ticket</strong> in the sidebar Quick Actions</li>
+    </ol>
+    <p>The status badge changes to a <span class="badge badge-green"><span class="badge-dot"></span>Closed</span> variant and the button switches to <strong>Reopen Ticket</strong> in case it needs to be revisited.</p>
+    <div class="callout callout-info">
+      <span class="callout-icon"><i class="ph ph-push-pin"></i></span>
+      <div>Closing a ticket does not delete it. The full history is preserved and accessible anytime. You can always reopen it if the issue resurfaces.</div>
+    </div>
+  </div>
+
+  <div class="section" id="step-8">
+    <h2><span class="step-num">8</span> Checking the Audit Log</h2>
+    <p>Navigate to <strong>Audit Log</strong> in the sidebar to view a comprehensive, immutable record of all actions.</p>
+    <h3>Filtering the Audit Log</h3>
+    <table class="data-table">
+      <thead><tr><th>Filter</th><th>Options</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Agent</strong></td><td>Filter by a specific staff member, or "All Agents"</td></tr>
+        <tr><td><strong>Action Category</strong></td><td>Filter by type of action (see below)</td></tr>
+      </tbody>
+    </table>
+    <h3>Action Categories</h3>
+    <table class="data-table">
+      <thead><tr><th>Badge</th><th>Action Code</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-purple"><span class="badge-dot"></span>Login</span></td><td><code>agent.login</code></td><td>Agent signed in</td></tr>
+        <tr><td><span class="badge badge-slate"><span class="badge-dot"></span>Logout</span></td><td><code>agent.logout</code></td><td>Agent signed out</td></tr>
+        <tr><td><span class="badge badge-amber"><span class="badge-dot"></span>Status</span></td><td><code>request.status</code></td><td>Ticket status was changed</td></tr>
+        <tr><td><span class="badge badge-purple"><span class="badge-dot"></span>Assignment</span></td><td><code>request.assignment</code></td><td>Ticket was assigned or re-assigned</td></tr>
+        <tr><td><span class="badge badge-blue"><span class="badge-dot"></span>Email</span></td><td><code>request.email</code></td><td>Email was sent to requester</td></tr>
+        <tr><td><span class="badge badge-teal"><span class="badge-dot"></span>Comment</span></td><td><code>request.comment</code></td><td>Internal note was added</td></tr>
+        <tr><td><span class="badge badge-orange"><span class="badge-dot"></span>Import</span></td><td><code>request.import</code></td><td>Request was manually imported</td></tr>
+      </tbody>
+    </table>
+    <h3>Reading an Audit Entry</h3>
+    <table class="data-table">
+      <thead><tr><th>Column</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Timestamp (UTC)</strong></td><td>Exact time the action occurred</td></tr>
+        <tr><td><strong>Agent</strong></td><td>Email of the agent who performed the action</td></tr>
+        <tr><td><strong>Action</strong></td><td>Color-coded badge</td></tr>
+        <tr><td><strong>Request</strong></td><td>Clickable <code>ACCT-###</code> link — opens ticket in a tab</td></tr>
+        <tr><td><strong>Details</strong></td><td>Key-value metadata chips (e.g., <code>status: New → Waiting</code>)</td></tr>
+        <tr><td><strong>IP Address</strong></td><td>Agent's IP at time of action</td></tr>
+        <tr><td><strong>Result</strong></td><td><i class="ph ph-check-circle" style="color:#10b981"></i> Success or <i class="ph ph-x-circle" style="color:#ef4444"></i> Failed</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-important">
+      <span class="callout-icon"><i class="ph ph-lock"></i></span>
+      <div><strong>The Audit Log is read-only.</strong> No entries can be modified or deleted. This provides a reliable forensic trail for compliance and accountability.</div>
+    </div>
+  </div>
+
+  <div class="section" id="navigation">
+    <h2><i class="ph ph-compass"></i> Navigation Reference</h2>
+    <div class="nav-diagram">
+      <div class="nav-node nav-node-primary"><span class="nav-node-icon"><i class="ph ph-lock-key"></i></span>Login Page</div>
+      <div class="nav-node"><span class="nav-node-icon"><i class="ph ph-chart-line-up"></i></span>Dashboard<br><small>(Overview)</small></div>
+      <div class="nav-node nav-node-sub"><span class="nav-node-icon"><i class="ph ph-clipboard-text"></i></span>Request Detail<br><small>(Tabbed View)</small></div>
+      <div class="nav-node"><span class="nav-node-icon"><i class="ph ph-download-simple"></i></span>Import Data</div>
+      <div class="nav-node"><span class="nav-node-icon"><i class="ph ph-shield-check"></i></span>Audit Log</div>
+      <div class="nav-node"><span class="nav-node-icon"><i class="ph ph-users-three"></i></span>User Mgmt<br><small>(Admin only)</small></div>
+      <div class="nav-node nav-node-sub"><span class="nav-node-icon"><i class="ph ph-envelope"></i></span>Compose Email<br><small>(Modal)</small></div>
+      <div class="nav-node nav-node-sub"><span class="nav-node-icon"><i class="ph ph-note-pencil"></i></span>Internal Note<br><small>(Inline)</small></div>
+      <div class="nav-node nav-node-sub"><span class="nav-node-icon"><i class="ph ph-swap"></i></span>Status Change<br><small>(Dropdown)</small></div>
+      <div class="nav-node nav-node-sub"><span class="nav-node-icon"><i class="ph ph-user-switch"></i></span>Assign Agent<br><small>(Dropdown)</small></div>
+    </div>
+  </div>
+
+  <div class="section" id="shortcuts">
+    <h2><i class="ph ph-keyboard"></i> Keyboard Shortcuts</h2>
+    <table class="data-table">
+      <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Cmd</kbd> / <kbd>Ctrl</kbd> + <kbd>W</kbd></td><td>Close the active request tab (returns to Dashboard)</td></tr>
+        <tr><td><kbd>Enter</kbd> <small>(in search)</small></td><td>Submit search query</td></tr>
+        <tr><td><kbd>Enter</kbd> <small>(in recipient field)</small></td><td>Add email recipient</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="glossary">
+    <h2><i class="ph ph-book-open"></i> Glossary</h2>
+    <div class="glossary-grid">
+      <div class="glossary-item"><dt>Request</dt><dd>An iLab account signup request submitted via email</dd></div>
+      <div class="glossary-item"><dt>Ticket</dt><dd>Used interchangeably with "Request" — the trackable record</dd></div>
+      <div class="glossary-item"><dt>Reference / Request Key</dt><dd>Unique identifier like <code>ACCT-001</code>, assigned automatically</dd></div>
+      <div class="glossary-item"><dt>Activity Stream</dt><dd>Threaded conversation view showing all messages, notes, and system events</dd></div>
+      <div class="glossary-item"><dt>Internal Note</dt><dd>Private comment visible only to support agents — never sent to requester</dd></div>
+      <div class="glossary-item"><dt>Smart Threading</dt><dd>Automatic linking of email replies to original request via Outlook Conversation ID</dd></div>
+      <div class="glossary-item"><dt>Power Automate</dt><dd>Microsoft workflow automation tool that pushes new emails into the dashboard</dd></div>
+      <div class="glossary-item"><dt>Audit Trail</dt><dd>The immutable log of every action performed in the system</dd></div>
+      <div class="glossary-item"><dt>Triage</dt><dd>The process of reviewing a new request and deciding next steps</dd></div>
+      <div class="glossary-item"><dt>SLA</dt><dd>Service Level Agreement — the target time to resolve a request</dd></div>
+    </div>
+  </div>
+</main>
+
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">
+  <i class="ph ph-arrow-up"></i>
+</button>
+
+<script>
+  const sections = document.querySelectorAll('.section');
+  const navLinks = document.querySelectorAll('.sidebar a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const id = entry.target.id;
+        const link = document.querySelector('.sidebar a[href="#' + id + '"]');
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+  sections.forEach(s => observer.observe(s));
+  window.addEventListener('scroll', () => {
+    document.getElementById('backToTop').classList.toggle('visible', window.scrollY > 400);
+  });
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 900) document.querySelector('.sidebar').classList.remove('open');
+    });
+  });
+</script>
+</body>
+</html>

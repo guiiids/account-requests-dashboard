@@ -98,7 +98,7 @@ The main table listing all requests. Each row shows:
 | ------------- | ------------------------------------------------------------------------------- |
 | **Reference** | Unique ticket ID (e.g., `ACCT-001`) in blue monospace                           |
 | **Subject**   | The email subject line, with the requester's name and organization nested below |
-| **Status**    | `Open`, `In Progress`, or `Closed` — color-coded badge                          |
+| **Status**    | `New`, `Waiting`, or `Closed` variants — color-coded badge                      |
 | **Owner**     | Which agent is assigned (or `—` if unassigned)                                  |
 | **Date**      | When the request was created                                                    |
 
@@ -186,9 +186,9 @@ Once you've opened a request, here's the typical workflow:
 
 ```mermaid
 flowchart TD
-    A["📬 New request arrives\n(Status: Open)"] --> B{"Assign to yourself?"}
+    A["📬 New request arrives\n(Status: New - Open)"] --> B{"Assign to yourself?"}
     B -->|Yes| C["Set Assignee to\nyour name"]
-    C --> D["Change status to\n'In Progress'"]
+    C --> D["Change status to\n'Waiting - for Support'"]
     D --> E{"Need more info\nfrom requester?"}
     E -->|Yes| F["📧 Reply via Email"]
     E -->|No| G["Process the request\nin iLab system"]
@@ -202,11 +202,17 @@ flowchart TD
 
 Click the **Status** dropdown in the sidebar. Options:
 
-| Status          | Dot Color | When to use                     |
-| --------------- | --------- | ------------------------------- |
-| **Open**        | 🔵 Blue   | Request hasn't been triaged yet |
-| **In Progress** | 🟡 Amber  | You're actively working on it   |
-| **Closed**      | 🟢 Green  | Request is fully resolved       |
+| Status                                  | Dot Color | When to use                                       |
+| --------------------------------------- | --------- | ------------------------------------------------- |
+| **New - Open**                          | 🔵 Blue   | Default state for new, untouched requests         |
+| **Waiting - for Support**               | 🟡 Amber  | Ticket is triaged and awaiting agent action       |
+| **Waiting - Information needed**        | 🟡 Amber  | You have asked the requester for more details     |
+| **Waiting - Approval needed**           | 🟡 Amber  | Awaiting internal or institutional approval       |
+| **Waiting - Answered**                  | 🟡 Amber  | Requester has replied, awaiting your review       |
+| **Waiting - Institution clarification** | 🟡 Amber  | Awaiting confirmation from the parent institution |
+| **Closed - Resolved**                   | 🟢 Green  | Request is successfully completed                 |
+| **Closed - Customer unresponsive**      | 🟢 Green  | Requester did not reply after several attempts    |
+| **Closed - Other**                      | 🟢 Green  | Ticket closed for reasons not covered above       |
 
 ### Assigning a Ticket
 
@@ -251,7 +257,7 @@ When a request is fully resolved:
 1. **Add a final note** explaining what was done (for audit trail purposes)
 2. Click **Close Ticket** in the sidebar Quick Actions
 
-The status badge changes to 🟢 **Closed** and the button switches to **Reopen Ticket** in case it needs to be revisited.
+The status badge changes to a 🟢 **Closed** variant (e.g., `Closed - Resolved`) and the button switches to **Reopen Ticket** in case it needs to be revisited.
 
 > [!NOTE]
 > Closing a ticket does not delete it. The full history is preserved and accessible anytime. You can always reopen it if the issue resurfaces.
@@ -277,15 +283,15 @@ Use the filter bar at the top:
 
 Every action is logged with a color-coded badge:
 
-| Badge     | Action Code          | What it means                                        |
-| --------- | -------------------- | ---------------------------------------------------- |
-| 🟣 Purple | `agent.login`        | Agent signed in                                      |
-| ⬜ Slate  | `agent.logout`       | Agent signed out                                     |
-| 🟡 Amber  | `request.status`     | Ticket status was changed (Open → In Progress, etc.) |
-| 🟣 Violet | `request.assignment` | Ticket was assigned or re-assigned                   |
-| 🔵 Blue   | `request.email`      | Email was sent to requester                          |
-| 🟢 Teal   | `request.comment`    | Internal note was added                              |
-| 🟠 Orange | `request.import`     | Request was manually imported                        |
+| Badge     | Action Code          | What it means                                   |
+| --------- | -------------------- | ----------------------------------------------- |
+| 🟣 Purple | `agent.login`        | Agent signed in                                 |
+| ⬜ Slate  | `agent.logout`       | Agent signed out                                |
+| 🟡 Amber  | `request.status`     | Ticket status was changed (e.g., New → Waiting) |
+| 🟣 Violet | `request.assignment` | Ticket was assigned or re-assigned              |
+| 🔵 Blue   | `request.email`      | Email was sent to requester                     |
+| 🟢 Teal   | `request.comment`    | Internal note was added                         |
+| 🟠 Orange | `request.import`     | Request was manually imported                   |
 
 ### Reading an Audit Entry
 
@@ -297,7 +303,7 @@ Each row shows:
 | **Agent**           | Email of the agent who performed the action              |
 | **Action**          | Color-coded badge (see above)                            |
 | **Request**         | Clickable `ACCT-###` link — opens the ticket in a tab    |
-| **Details**         | Key-value metadata chips (e.g., `status: Open → Closed`) |
+| **Details**         | Key-value metadata chips (e.g., `status: New → Waiting`) |
 | **IP Address**      | Agent's IP at time of action                             |
 | **Result**          | ✅ Success or ❌ Failed                                  |
 

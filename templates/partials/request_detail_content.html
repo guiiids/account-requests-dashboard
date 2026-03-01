@@ -557,26 +557,25 @@
                              style="padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.8rem;">
                             <span style="display:flex;align-items:center;gap:0.5rem;">
                                 <span class="option-dot
-                                    {% if request.status == 'Open' %}dot-open
-                                    {% elif request.status == 'In Progress' %}dot-progress
-                                    {% else %}dot-closed{% endif %}"></span>
-                                <span id="status-display-{{ request.request_key }}">{{ request.status or 'Open' }}</span>
+                                    {% if request.status.startswith('New') %}dot-open
+                                    {% elif request.status.startswith('Waiting') %}dot-progress
+                                    {% elif request.status.startswith('Closed') %}dot-closed
+                                    {% else %}dot-open{% endif %}"></span>
+                                <span id="status-display-{{ request.request_key }}">{{ request.status or 'New - Open' }}</span>
                             </span>
                             <i class="ph-bold ph-caret-down custom-select-chevron"></i>
                         </div>
                         <div class="custom-select-dropdown" id="status-dropdown-{{ request.request_key }}">
-                            <div class="custom-select-option {% if request.status == 'Open' %}selected{% endif %}"
-                                 onclick="selectStatus('{{ request.request_key }}', 'Open')">
-                                <span class="option-dot dot-open"></span> Open
+                            {% for status in valid_statuses %}
+                            <div class="custom-select-option {% if request.status == status %}selected{% endif %}"
+                                 onclick="selectStatus('{{ request.request_key }}', '{{ status }}')">
+                                <span class="option-dot
+                                    {% if status.startswith('New') %}dot-open
+                                    {% elif status.startswith('Waiting') %}dot-progress
+                                    {% elif status.startswith('Closed') %}dot-closed
+                                    {% else %}dot-open{% endif %}"></span> {{ status }}
                             </div>
-                            <div class="custom-select-option {% if request.status == 'In Progress' %}selected{% endif %}"
-                                 onclick="selectStatus('{{ request.request_key }}', 'In Progress')">
-                                <span class="option-dot dot-progress"></span> In Progress
-                            </div>
-                            <div class="custom-select-option {% if request.status == 'Closed' %}selected{% endif %}"
-                                 onclick="selectStatus('{{ request.request_key }}', 'Closed')">
-                                <span class="option-dot dot-closed"></span> Closed
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -690,10 +689,13 @@
 
     function selectStatus(key, value) {
         // Update display
-        const dotMap = { 'Open': 'dot-open', 'In Progress': 'dot-progress', 'Closed': 'dot-closed' };
+        let dotClass = 'dot-open';
+        if (value.startsWith('Waiting')) dotClass = 'dot-progress';
+        else if (value.startsWith('Closed')) dotClass = 'dot-closed';
+        
         const triggerContent = document.querySelector('#status-trigger-' + key + ' span span:first-child');
         if (triggerContent) {
-            triggerContent.className = 'option-dot ' + (dotMap[value] || 'dot-open');
+            triggerContent.className = 'option-dot ' + dotClass;
         }
         document.getElementById('status-display-' + key).textContent = value;
 

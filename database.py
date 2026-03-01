@@ -10,6 +10,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_NAME = 'account_requests.db'
 
+VALID_STATUSES = [
+    'Waiting - Approval needed',
+    'Waiting - Information needed',
+    'Waiting - for Support',
+    'Waiting - Answered',
+    'Waiting - Institution clarification',
+    'Closed - Resolved',
+    'Closed - Customer unresponsive',
+    'Closed - Other',
+    'New - Open'
+]
+
 def get_db_path():
     """Get absolute path to the database file.
     Uses DB_PATH env var if set (for Azure persistent mount), otherwise
@@ -185,6 +197,12 @@ def migrate_db():
         c.execute('CREATE INDEX IF NOT EXISTS idx_audit_actor_email ON audit_log(actor_email)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_audit_action      ON audit_log(action)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_audit_target_id   ON audit_log(target_id)')
+
+        # Migration: Update legacy statuses to new granular ones
+        c.execute("UPDATE requests SET status = 'New - Open' WHERE status = 'Open'")
+        c.execute("UPDATE requests SET status = 'Waiting - for Support' WHERE status = 'In Progress'")
+        c.execute("UPDATE requests SET status = 'Closed - Resolved' WHERE status = 'Closed'")
+        
         conn.commit()
 
 
@@ -230,7 +248,7 @@ def create_request(requester_email, requester_name=None, organization=None,
     return {
         'id': request_id,
         'request_key': request_key,
-        'status': 'Open',
+        'status': 'New - Open',
         'requester_email': requester_email,
         'requester_name': requester_name,
         'organization': organization,
@@ -293,10 +311,9 @@ def get_all_requests(status_filter=None, search_query=None):
 def update_request_status(request_key, new_status, updated_by=None):
     """
     Update the status of a request.
-    Valid statuses: 'Open', 'In Progress', 'Closed'
+    Valid statuses: See VALID_STATUSES
     """
-    valid_statuses = ['Open', 'In Progress', 'Closed']
-    if new_status not in valid_statuses:
+    if new_status not in VALID_STATUSES:
         return False
 
     now = datetime.now(timezone.utc).isoformat()
@@ -304,7 +321,7 @@ def update_request_status(request_key, new_status, updated_by=None):
     with get_db() as conn:
         c = conn.cursor()
 
-        if new_status == 'Closed':
+        if new_status.startswith('Closed'):
             c.execute('''
                 UPDATE requests
                 SET status = ?, updated_at = ?, closed_at = ?
@@ -416,8 +433,23 @@ def get_request_counts():
 
     counts = {'Open': 0, 'In Progress': 0, 'Closed': 0, 'Total': 0}
     for row in rows:
-        counts[row['status']] = row['count']
-        counts['Total'] += row['count']
+        status_val = row['status']
+        count_val = row['count']
+        
+        # Map granular statuses to dashboard categories
+        if status_val == 'New - Open':
+            counts['Open'] += count_val
+        elif status_val.startswith('Waiting'):
+            counts['In Progress'] += count_val
+        elif status_val.startswith('Closed'):
+            counts['Closed'] += count_val
+        else:
+            # Fallback for legacy data or unanticipated values
+            if status_val == 'Open': counts['Open'] += count_val
+            elif status_val == 'In Progress': counts['In Progress'] += count_val
+            elif status_val == 'Closed': counts['Closed'] += count_val
+
+        counts['Total'] += count_val
 
     return counts
 

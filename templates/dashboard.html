@@ -130,10 +130,12 @@
                                     <div class="user-text">
                                         <div class="user-name">{{ req.original_subject or 'Account Request' }}</div>
                                         <div class="user-sub">
-                                            {{ req.requester_name or req.requester_email }}
-                                            {% if req.organization %}
-                                            <span style="margin-left: 0.5rem; font-weight: 500;">
-                                                {{ req.organization }}
+                                            <i class="ph ph-envelope-simple" style="font-size: 0.95em; opacity: 0.8;"></i>
+                                            {{ req.requester_email }}
+                                            {% if req.ilab_link %}
+                                            <span style="margin-left: 0.5rem; font-weight: 500; color: var(--text-tertiary); display: flex; align-items: center; gap: 0.15rem;">
+                                                <i class="ph ph-link" style="font-size: 0.85em;"></i>
+                                                {{ req.ilab_link|extract_domain }}
                                             </span>
                                             {% endif %}
                                         </div>
@@ -141,7 +143,7 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge badge-{{ req.status|lower|replace(' ', '-') }}">
+                                <span class="badge {{ req.status|status_color_class }}">
                                     <span class="badge-dot"></span>
                                     {{ req.status }}
                                 </span>

@@ -1,5 +1,5 @@
 ######## Deps: build wheels (cached) ########
-FROM python:3.11-slim AS deps
+FROM python:3.12-slim AS deps
 WORKDIR /w
 # Only needed if any deps compile; drop if all are manylinux wheels
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
@@ -10,9 +10,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
   pip wheel --prefer-binary -r requirements.txt -w /wheels
 
 ######## App: small, fast to push ########
-FROM python:3.11-slim AS app
+FROM python:3.12-slim AS app
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && useradd -m -u 1000 appuser \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /wheels /wheels
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
@@ -20,6 +21,9 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 # app files last for cache hits
 COPY . .
 RUN sed -i 's/\r$//' ./startup.sh && chmod +x ./startup.sh
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=5 \

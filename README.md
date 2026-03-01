@@ -229,7 +229,7 @@ All routes are prefixed with `/other` and require staff authentication unless no
 | :----: | :------------------------------------ | :------------------------------------------------- |
 | `GET`  | `/other`                              | Dashboard — queue list with status filter + search |
 | `GET`  | `/other/api/request/<key>/detail`     | Fetch request detail as HTML partial (for tabs)    |
-| `POST` | `/other/api/request/<key>/status`     | Update status (Open / In Progress / Closed)        |
+| `POST` | `/other/api/request/<key>/status`     | Update status (New / Waiting / Closed variants)    |
 | `POST` | `/other/api/request/<key>/assign`     | Assign request to a staff member                   |
 | `POST` | `/other/api/request/<key>/comment`    | Add an internal note                               |
 | `POST` | `/other/api/request/<key>/send-email` | Send email to requester(s)                         |
