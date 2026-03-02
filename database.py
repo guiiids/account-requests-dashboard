@@ -282,17 +282,34 @@ def get_request_by_key(request_key):
     return dict(row) if row else None
 
 
+# Dashboard category filters → SQL prefix mapping
+_CATEGORY_PREFIXES = {
+    'New': 'New%',
+    'Waiting': 'Waiting%',
+    'Closed': 'Closed%',
+}
+
+
 def get_all_requests(status_filter=None, search_query=None):
     """
     Get all requests, optionally filtered by status and/or search query.
+    Supports both category filters ('New', 'Waiting', 'Closed') via
+    prefix matching and exact status filters ('New - Open').
     Returns newest first.
     """
     query = 'SELECT * FROM requests WHERE 1=1'
     params = []
 
     if status_filter and status_filter != 'All':
-        query += ' AND status = ?'
-        params.append(status_filter)
+        prefix = _CATEGORY_PREFIXES.get(status_filter)
+        if prefix:
+            # Category filter — use LIKE for prefix match
+            query += ' AND status LIKE ?'
+            params.append(prefix)
+        else:
+            # Exact status filter (e.g., 'New - Open')
+            query += ' AND status = ?'
+            params.append(status_filter)
 
     if search_query:
         query += ' AND (requester_email LIKE ? OR requester_name LIKE ? OR request_key LIKE ?)'
@@ -421,7 +438,11 @@ def get_comments_for_request(request_key):
 
 
 def get_request_counts():
-    """Get counts by status for dashboard display."""
+    """Get counts by status category for dashboard display.
+    
+    Buckets match the prefix-based category system:
+    New (status starts with 'New'), Waiting ('Waiting'), Closed ('Closed').
+    """
     with get_db() as conn:
         c = conn.cursor()
         c.execute('''
@@ -431,23 +452,24 @@ def get_request_counts():
         ''')
         rows = c.fetchall()
 
-    counts = {'Open': 0, 'In Progress': 0, 'Closed': 0, 'Total': 0}
+    counts = {'New': 0, 'Waiting': 0, 'Closed': 0, 'Total': 0}
     for row in rows:
-        status_val = row['status']
+        status_val = row['status'] or ''
         count_val = row['count']
-        
-        # Map granular statuses to dashboard categories
-        if status_val == 'New - Open':
-            counts['Open'] += count_val
+
+        # Map granular statuses to dashboard categories by prefix
+        if status_val.startswith('New'):
+            counts['New'] += count_val
         elif status_val.startswith('Waiting'):
-            counts['In Progress'] += count_val
+            counts['Waiting'] += count_val
         elif status_val.startswith('Closed'):
             counts['Closed'] += count_val
         else:
-            # Fallback for legacy data or unanticipated values
-            if status_val == 'Open': counts['Open'] += count_val
-            elif status_val == 'In Progress': counts['In Progress'] += count_val
-            elif status_val == 'Closed': counts['Closed'] += count_val
+            # Legacy fallback
+            if status_val == 'Open':
+                counts['New'] += count_val
+            elif status_val == 'In Progress':
+                counts['Waiting'] += count_val
 
         counts['Total'] += count_val
 

@@ -35,27 +35,27 @@
                 </div>
             </div>
 
-            <!-- Open -->
-            <div class="stat-card {% if current_filter == 'Open' %}active{% endif %}" onclick="filterByStatus('Open')">
+            <!-- New -->
+            <div class="stat-card {% if current_filter == 'New' %}active{% endif %}" onclick="filterByStatus('New')">
                 <div class="stat-icon-wrapper bg-indigo-light text-indigo">
                     <i class="ph ph-envelope-open"></i>
                 </div>
                 <div class="stat-content">
-                    <div class="stat-value text-indigo">{{ counts.Open }}</div>
-                    <div class="stat-label">Open</div>
+                    <div class="stat-value text-indigo">{{ counts.New }}</div>
+                    <div class="stat-label">New</div>
                     <div class="stat-trend">Needs Action</div>
                 </div>
             </div>
 
-            <!-- In Progress -->
-            <div class="stat-card {% if current_filter == 'In Progress' %}active{% endif %}"
-                onclick="filterByStatus('In Progress')">
+            <!-- Waiting -->
+            <div class="stat-card {% if current_filter == 'Waiting' %}active{% endif %}"
+                onclick="filterByStatus('Waiting')">
                 <div class="stat-icon-wrapper bg-amber-light text-amber">
                     <i class="ph ph-clock-clockwise"></i>
                 </div>
                 <div class="stat-content">
-                    <div class="stat-value text-amber">{{ counts['In Progress'] }}</div>
-                    <div class="stat-label">In Progress</div>
+                    <div class="stat-value text-amber">{{ counts.Waiting }}</div>
+                    <div class="stat-label">Waiting</div>
                     <div class="stat-trend">Processing</div>
                 </div>
             </div>

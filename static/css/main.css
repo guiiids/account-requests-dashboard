@@ -369,6 +369,7 @@ a {
   font-weight: 600;
   /* text-transform: uppercase; */
   letter-spacing: 0.025em;
+  white-space: nowrap;
 }
 
 .badge-dot {
@@ -487,7 +488,7 @@ a {
 
 .stat-trend {
   font-size: 0.75rem;
-  margin-top: 0.5rem;
+  margin-top: 0.125rem;
   color: var(--text-tertiary);
 }
 

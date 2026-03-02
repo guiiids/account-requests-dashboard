@@ -2,7 +2,7 @@
 Account Requests Dashboard - Flask Application
 A staff-only dashboard for managing iLab account signup requests.
 """
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory
 import database
 import audit
 import email_parser
@@ -135,8 +135,11 @@ def format_datetime(value, fmt='friendly'):
         return ''
     date_obj = None
     if isinstance(value, str):
+        import re
         # Normalize: replace T separator with space, strip trailing Z
         normalized = value.replace('T', ' ').rstrip('Z').strip()
+        # Strip timezone offset like +00:00 or -05:00
+        normalized = re.sub(r'[+-]\d{2}:\d{2}$', '', normalized).strip()
         formats_to_try = [
             '%Y-%m-%d %H:%M:%S.%f',  # 2026-02-19 21:47:42.434726
             '%Y-%m-%d %H:%M:%S',     # 2026-02-19 21:47:42
@@ -871,6 +874,14 @@ def import_request():
         return redirect(url_for('request_detail', request_key=new_request['request_key']))
 
     return render_template('import.html')
+
+
+@app.route('/other/onboarding')
+@staff_required
+def onboarding_guide():
+    """Serve the Agilent account request onboarding guide."""
+    docs_dir = os.path.join(app.root_path, 'docs')
+    return send_from_directory(docs_dir, 'onboarding_guide_v1_claude.html')
 
 
 # =============================================================================

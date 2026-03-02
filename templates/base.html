@@ -66,10 +66,12 @@
                     <i class="ph ph-squares-four"></i>
                     <span>Overview</span>
                 </a>
-                <a href="{{ url_for('import_request') }}"
-                    class="nav-item {% if request.endpoint == 'import_request' %}active{% endif %}">
-                    <i class="ph ph-file-arrow-up"></i>
-                    <span>Import Data</span>
+
+
+                <a href="{{ url_for('onboarding_guide') }}"
+                    class="nav-item {% if request.endpoint == 'onboarding_guide' %}active{% endif %}">
+                    <i class="ph ph-book-open"></i>
+                    <span>Onboarding Guide</span>
                 </a>
 
                 {% if current_user.role == 'admin' %}
@@ -83,6 +85,11 @@
                     class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
                     <i class="ph ph-users"></i>
                     <span>Users</span>
+                </a>
+                <a href="{{ url_for('import_request') }}"
+                    class="nav-item {% if request.endpoint == 'import_request' %}active{% endif %}">
+                    <i class="ph ph-file-arrow-up"></i>
+                    <span>Import Data</span>
                 </a>
                 <a href="#" class="nav-item disabled" style="opacity: 0.5;">
                     <i class="ph ph-chart-bar"></i>
