@@ -473,3 +473,131 @@ function switchActivityTab(tabType) {
         }
     });
 }
+
+
+/* ── Dynamic Composer Toggle ── */
+const _inlineRecipients = new Map();
+
+/**
+ * Toggle the dynamic composer at the top of the message thread.
+ * @param {'note'|'email'} mode
+ * @param {string} key - request key
+ */
+function toggleComposer(mode, key) {
+    const wrapper = document.getElementById(`dynamic-composer-${key}`);
+    const notePane = document.getElementById(`composer-note-${key}`);
+    const emailPane = document.getElementById(`composer-email-${key}`);
+    const fabNote = document.getElementById(`fab-note-${key}`);
+    const fabEmail = document.getElementById(`fab-email-${key}`);
+    if (!wrapper || !notePane || !emailPane) return;
+
+    const alreadyOpen = wrapper.style.display !== 'none';
+    const currentMode = notePane.style.display !== 'none' ? 'note' : 'email';
+
+    if (alreadyOpen && currentMode === mode) {
+        // Close if same button clicked again
+        closeComposer(key);
+        return;
+    }
+
+    // Show wrapper, toggle panes
+    wrapper.style.display = '';
+    notePane.style.display = mode === 'note' ? '' : 'none';
+    emailPane.style.display = mode === 'email' ? '' : 'none';
+
+    // Highlight active FAB
+    if (fabNote) {
+        fabNote.classList.toggle('ring-2', mode === 'note');
+        fabNote.classList.toggle('ring-amber-400', mode === 'note');
+        fabNote.classList.toggle('shadow-md', mode === 'note');
+    }
+    if (fabEmail) {
+        fabEmail.classList.toggle('ring-2', mode === 'email');
+        fabEmail.classList.toggle('ring-blue-400', mode === 'email');
+        fabEmail.classList.toggle('shadow-md', mode === 'email');
+    }
+
+    // Auto-focus the textarea
+    const textarea = mode === 'note'
+        ? document.getElementById(`note-body-${key}`)
+        : document.getElementById(`inline-email-body-${key}`);
+    if (textarea) setTimeout(() => textarea.focus(), 100);
+
+    // Scroll to top of the thread so composer is visible
+    const scrollArea = wrapper.closest('.overflow-y-auto');
+    if (scrollArea) scrollArea.scrollTop = 0;
+}
+
+function closeComposer(key) {
+    const wrapper = document.getElementById(`dynamic-composer-${key}`);
+    if (wrapper) wrapper.style.display = 'none';
+
+    const fabNote = document.getElementById(`fab-note-${key}`);
+    const fabEmail = document.getElementById(`fab-email-${key}`);
+    if (fabNote) fabNote.classList.remove('ring-2', 'ring-amber-400', 'shadow-md');
+    if (fabEmail) fabEmail.classList.remove('ring-2', 'ring-blue-400', 'shadow-md');
+}
+
+/* ── Inline Email Recipient Helpers ── */
+function addInlineRecipient(key) {
+    const input = document.getElementById(`inline-new-recipient-${key}`);
+    if (input && input.value.trim()) {
+        addInlineRecipientEmail(key, input.value.trim());
+        input.value = '';
+    }
+}
+
+function addInlineRecipientEmail(key, email) {
+    if (!email) return;
+    if (!_inlineRecipients.has(key)) _inlineRecipients.set(key, []);
+    const list = _inlineRecipients.get(key);
+    if (list.includes(email)) return;
+    list.push(email);
+    renderInlineRecipients(key);
+}
+
+function removeInlineRecipient(key, email) {
+    const list = _inlineRecipients.get(key) || [];
+    const idx = list.indexOf(email);
+    if (idx > -1) { list.splice(idx, 1); renderInlineRecipients(key); }
+}
+
+function renderInlineRecipients(key) {
+    const container = document.getElementById(`inline-recipient-list-${key}`);
+    const list = _inlineRecipients.get(key) || [];
+    if (!container) return;
+    container.innerHTML = list.map(email => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            ${email}
+            <i class="ph-bold ph-x text-blue-400 hover:text-blue-700 cursor-pointer" style="font-size:10px"
+               onclick="removeInlineRecipient('${key}', '${email}')"></i>
+        </span>
+    `).join('');
+}
+
+/**
+ * Send email from the inline composer
+ */
+async function sendInlineEmail(key) {
+    const subject = document.getElementById(`inline-email-subject-${key}`)?.value || '';
+    const body = document.getElementById(`inline-email-body-${key}`)?.value || '';
+    const recipients = _inlineRecipients.get(key) || [];
+
+    if (!recipients.length) { alert('Add at least one recipient'); return; }
+    if (!body.trim()) { alert('Message body is empty'); return; }
+
+    const btn = document.getElementById(`inline-send-email-btn-${key}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph-bold ph-circle-notch" style="display:inline-block;animation:spin 0.8s linear infinite"></i> Sending...';
+    }
+
+    const ok = await RequestActions.apiCall(`/other/api/request/${key}/send-email`, {
+        subject, body, to_list: recipients
+    }, key);
+
+    if (!ok && btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ph-bold ph-paper-plane-right"></i> Send Email';
+    }
+}

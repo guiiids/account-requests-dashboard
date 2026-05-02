@@ -11,22 +11,22 @@ The standard iLab notification email from support@ilabsolutions.com contains:
     link: <ilab admin link>
 """
 import re
-from datetime import datetime
+from typing import Optional
 
 
-def parse_ilab_email(subject: str, body: str, sender: str = None) -> dict:
+def parse_ilab_email(subject: str, body: str, sender: Optional[str] = None) -> dict:
     """
     Parse an iLab account request notification email.
-    
+
     Args:
         subject: Email subject line (e.g., "Manami Roychowdhury-Saha is requesting an account")
         body: Email body (plain text preferred, HTML will be stripped)
         sender: Email sender address
-    
+
     Returns:
         dict with parsed fields:
         - requester_name: str
-        - requester_email: str  
+        - requester_email: str
         - institution: str
         - lab_name: str
         - request_time: str
@@ -44,10 +44,10 @@ def parse_ilab_email(subject: str, body: str, sender: str = None) -> dict:
         'raw_body': body,
         'is_valid': False
     }
-    
+
     # Clean the body - strip HTML if present
     clean_body = strip_html(body)
-    
+
     # Parse key-value pairs from the iLab format
     # Pattern: "key: value" at the start of a line or after whitespace
     patterns = {
@@ -58,7 +58,7 @@ def parse_ilab_email(subject: str, body: str, sender: str = None) -> dict:
         'time': r'(?:^|\n)\s*time:\s*(.+?)(?:\n|$)',
         'link': r'(?:^|\n)\s*link:\s*\n?\s*(https?://\S+)',
     }
-    
+
     for key, pattern in patterns.items():
         match = re.search(pattern, clean_body, re.IGNORECASE | re.MULTILINE)
         if match:
@@ -75,17 +75,17 @@ def parse_ilab_email(subject: str, body: str, sender: str = None) -> dict:
                 result['request_time'] = value
             elif key == 'link':
                 result['ilab_link'] = value
-    
+
     # Fallback: Try to extract name from subject if not found in body
     # Subject format: "Firstname Lastname is requesting an account"
     if not result['requester_name'] and subject:
         subject_match = re.match(r'^(.+?)\s+is\s+requesting\s+an?\s+account', subject, re.IGNORECASE)
         if subject_match:
             result['requester_name'] = subject_match.group(1).strip()
-    
+
     # Determine validity - must have at least email or name
     result['is_valid'] = bool(result['requester_email'] or result['requester_name'])
-    
+
     return result
 
 
@@ -95,22 +95,22 @@ def strip_html(text: str) -> str:
     """
     if not text:
         return ''
-    
+
     # Remove HTML comments
     text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
-    
+
     # Remove style and script blocks
     text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    
+
     # Convert <br> and <p> to newlines
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
     text = re.sub(r'</p>', '\n', text, flags=re.IGNORECASE)
     text = re.sub(r'<p[^>]*>', '', text, flags=re.IGNORECASE)
-    
+
     # Remove all other HTML tags
     text = re.sub(r'<[^>]+>', '', text)
-    
+
     # Decode common HTML entities
     entities = {
         '&nbsp;': ' ',
@@ -132,12 +132,12 @@ def strip_html(text: str) -> str:
 
     # Collapse multiple blank lines
     text = re.sub(r'\n\s*\n+', '\n\n', text)
-    
+
     # Strip leading whitespace from each line and collapse inline spaces
     lines = text.split('\n')
     lines = [line.strip() for line in lines]
     text = '\n'.join(lines)
-    
+
     return text.strip()
 
 
@@ -148,12 +148,12 @@ def is_original_request_email(sender: str, subject: str) -> bool:
     """
     if not sender:
         return False
-    
+
     sender_lower = sender.lower()
     # Original notifications come from iLab
     if 'ilabsolutions.com' in sender_lower or 'ilab' in sender_lower:
         return True
-    
+
     return False
 
 
@@ -164,7 +164,7 @@ def extract_request_from_thread(body: str) -> dict:
     """
     # Look for the original iLab block - it contains the key-value format
     # Find the section that has name:/email:/institution:/lab_name: together
-    
+
     # Use the same parsing logic
     return parse_ilab_email('', body)
 
@@ -182,7 +182,7 @@ if __name__ == '__main__':
     link:
     https://my.ilabsolutions.com/administration/account_requests
     """
-    
+
     result = parse_ilab_email("Manami Roychowdhury-Saha is requesting an account", sample)
     print("Parsed result:")
     for k, v in result.items():

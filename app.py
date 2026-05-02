@@ -296,7 +296,6 @@ def force_change_password():
     """Force user to change password on first login."""
     user = get_current_user()
     error = None
-    success = None
 
     if request.method == 'POST':
         new_password = request.form.get('new_password', '')
@@ -419,9 +418,18 @@ def dashboard():
     status_filter = request.args.get('status', 'All')
     search_query = request.args.get('search', '')
 
+    statuses = request.args.getlist('statuses')
+    owners = request.args.getlist('owners')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
     requests_list = database.get_all_requests(
         status_filter=status_filter if status_filter != 'All' else None,
-        search_query=search_query if search_query else None
+        search_query=search_query if search_query else None,
+        statuses=statuses if statuses else None,
+        owners=owners if owners else None,
+        start_date=start_date if start_date else None,
+        end_date=end_date if end_date else None
     )
 
     counts = database.get_request_counts()
@@ -432,6 +440,10 @@ def dashboard():
         counts=counts,
         current_filter=status_filter,
         search_query=search_query,
+        statuses=statuses,
+        owners=owners,
+        start_date=start_date,
+        end_date=end_date,
         staff_users=database.get_staff_users()
     )
 
@@ -657,7 +669,7 @@ def api_send_email(request_key):
 
     # Fetch request to build default subject and thread history
     req = database.get_request_by_key(request_key)
-    
+
     # Default subject if not provided
     if not subject:
         subject = f"Re: {req.get('original_subject', 'Your Account Request')}" if req else 'Your Account Request'
@@ -667,8 +679,8 @@ def api_send_email(request_key):
     try:
         # Build threaded email payload
         thread_parts = [body]
-        thread_parts.append("\n\n" + "-"*60 + "\nPrevious Messages\n" + "-"*60)
-        
+        thread_parts.append("\n\n" + "-" * 60 + "\nPrevious Messages\n" + "-" * 60)
+
         comments = database.get_comments_for_request(request_key)
         # Iterate from newest to oldest
         for c in reversed(comments):
@@ -682,8 +694,8 @@ def api_send_email(request_key):
                 if subj:
                     thread_parts.append(f"Subject: {subj}")
                 thread_parts.append(f"\n{c.get('body')}")
-                thread_parts.append("\n" + "-"*40)
-                
+                thread_parts.append("\n" + "-" * 40)
+
         if req:
             author = req.get('requester_name') or req.get('requester_email')
             date_str = req.get('created_at', '')[:19].replace('T', ' ') if req.get('created_at') else ''
@@ -694,8 +706,8 @@ def api_send_email(request_key):
             if subj:
                 thread_parts.append(f"Subject: {subj}")
             thread_parts.append(f"\n{req.get('original_body')}")
-            thread_parts.append("\n" + "-"*60)
-            
+            thread_parts.append("\n" + "-" * 60)
+
         email_payload = "\n".join(thread_parts)
 
         # Send the email
@@ -946,6 +958,74 @@ def audit_log_viewer():
         filter_agent=filter_agent,
         filter_action=filter_action,
     )
+
+# =============================================================================
+# Bulk Operations API (Admin Only)
+# =============================================================================
+
+
+@app.route('/other/api/bulk/delete', methods=['POST'])
+@admin_required
+def bulk_delete():
+    """Delete multiple requests (admin only)."""
+    data = request.get_json()
+    keys = data.get('request_keys', [])
+    if not keys:
+        return jsonify({'success': False, 'error': 'No request keys provided'}), 400
+
+    actor = get_current_user()
+    count = database.delete_requests(keys)
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='bulk.delete',
+        target_type='request',
+        details={'deleted_count': count, 'request_keys': keys},
+    )
+    return jsonify({'success': True, 'deleted': count})
+
+
+@app.route('/other/api/bulk/status', methods=['POST'])
+@admin_required
+def bulk_status():
+    """Change status for multiple requests (admin only)."""
+    data = request.get_json()
+    keys = data.get('request_keys', [])
+    new_status = data.get('status', '')
+    if not keys or not new_status:
+        return jsonify({'success': False, 'error': 'Missing request_keys or status'}), 400
+    if new_status not in database.VALID_STATUSES:
+        return jsonify({'success': False, 'error': f'Invalid status: {new_status}'}), 400
+
+    actor = get_current_user()
+    count = database.bulk_update_status(keys, new_status)
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='bulk.status_change',
+        target_type='request',
+        details={'updated_count': count, 'new_status': new_status, 'request_keys': keys},
+    )
+    return jsonify({'success': True, 'updated': count})
+
+
+@app.route('/other/api/bulk/assign', methods=['POST'])
+@admin_required
+def bulk_assign():
+    """Assign multiple requests to a staff member (admin only)."""
+    data = request.get_json()
+    keys = data.get('request_keys', [])
+    assignee = data.get('assignee', '')
+    if not keys:
+        return jsonify({'success': False, 'error': 'No request keys provided'}), 400
+
+    actor = get_current_user()
+    count = database.bulk_assign(keys, assignee)
+    audit.log_audit_event(
+        actor_email=actor['email'],
+        action='bulk.assign',
+        target_type='request',
+        details={'updated_count': count, 'assignee': assignee or None, 'request_keys': keys},
+    )
+    return jsonify({'success': True, 'updated': count})
 
 
 # =============================================================================

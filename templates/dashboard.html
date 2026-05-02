@@ -4,6 +4,55 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Insight Grid (Modern Stats) -->
+<div class="stats-grid mb-4">
+    <!-- Total -->
+    <div class="stat-card {% if current_filter == 'All' %}active{% endif %}" onclick="filterByStatus('All')">
+        <div class="stat-icon-wrapper bg-blue-light text-blue">
+            <i class="ph ph-files"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value">{{ counts.Total }}</div>
+            <div class="stat-label">Total Requests</div>
+        </div>
+    </div>
+
+    <!-- New -->
+    <div class="stat-card {% if current_filter == 'New' %}active{% endif %}" onclick="filterByStatus('New')">
+        <div class="stat-icon-wrapper bg-indigo-light text-indigo">
+            <i class="ph ph-envelope-open"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value text-indigo">{{ counts.New }}</div>
+            <div class="stat-label">New</div>
+        </div>
+    </div>
+
+    <!-- Waiting -->
+    <div class="stat-card {% if current_filter == 'Waiting' %}active{% endif %}"
+        onclick="filterByStatus('Waiting')">
+        <div class="stat-icon-wrapper bg-amber-light text-amber">
+            <i class="ph ph-clock-clockwise"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value text-amber">{{ counts.Waiting }}</div>
+            <div class="stat-label">Waiting</div>
+        </div>
+    </div>
+
+    <!-- Closed -->
+    <div class="stat-card {% if current_filter == 'Closed' %}active{% endif %}"
+        onclick="filterByStatus('Closed')">
+        <div class="stat-icon-wrapper bg-emerald-light text-emerald">
+            <i class="ph ph-check-circle"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value text-emerald">{{ counts.Closed }}</div>
+            <div class="stat-label">Closed</div>
+        </div>
+    </div>
+</div>
+
 <!-- Tab Bar -->
 <div id="tab-bar" class="tab-bar">
     <div class="tab-list" id="tab-list">
@@ -21,93 +70,52 @@
     <!-- Home tab content (existing dashboard content) -->
     <div id="tab-content-home" class="tab-content active">
 
-        <!-- Insight Grid (Modern Stats) -->
-        <div class="stats-grid mb-4">
-            <!-- Total -->
-            <div class="stat-card {% if current_filter == 'All' %}active{% endif %}" onclick="filterByStatus('All')">
-                <div class="stat-icon-wrapper bg-blue-light text-blue">
-                    <i class="ph ph-files"></i>
-                </div>
-                <div class="stat-content">
-                    <div class="stat-value">{{ counts.Total }}</div>
-                    <div class="stat-label">Total Requests</div>
-                    <div class="stat-trend neutral">All time</div>
-                </div>
-            </div>
+        <!-- Main Section Container -->
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+            
+            <!-- Requests List -->
+            <div class="card" style="flex: 1; min-width: 0;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="ph ph-list-dashes"></i>
+                        <span>All Requests</span>
+                        {% if current_filter != 'All' %}
+                        <span class="badge"
+                            style="background: var(--surface-100); color: var(--text-secondary); margin-left: 0.5rem;">
+                            {{ current_filter }}
+                        </span>
+                        {% endif %}
+                    </div>
 
-            <!-- New -->
-            <div class="stat-card {% if current_filter == 'New' %}active{% endif %}" onclick="filterByStatus('New')">
-                <div class="stat-icon-wrapper bg-indigo-light text-indigo">
-                    <i class="ph ph-envelope-open"></i>
-                </div>
-                <div class="stat-content">
-                    <div class="stat-value text-indigo">{{ counts.New }}</div>
-                    <div class="stat-label">New</div>
-                    <div class="stat-trend">Needs Action</div>
-                </div>
-            </div>
+                    <div class="header-actions" style="display: flex; gap: 1rem;">
+                        <!-- Actions -->
+                        <div class="search-global">
+                            <i class="ph ph-magnifying-glass"></i>
+                            <input type="text" name="search" placeholder="Search requests..." value="{{ search_query or '' }}" form="filter-form">
+                        </div>
 
-            <!-- Waiting -->
-            <div class="stat-card {% if current_filter == 'Waiting' %}active{% endif %}"
-                onclick="filterByStatus('Waiting')">
-                <div class="stat-icon-wrapper bg-amber-light text-amber">
-                    <i class="ph ph-clock-clockwise"></i>
-                </div>
-                <div class="stat-content">
-                    <div class="stat-value text-amber">{{ counts.Waiting }}</div>
-                    <div class="stat-label">Waiting</div>
-                    <div class="stat-trend">Processing</div>
-                </div>
-            </div>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('filter-panel').style.display = 'block';">
+                            <i class="ph ph-faders"></i>
+                            <span>Filter</span>
+                        </button>
 
-            <!-- Closed -->
-            <div class="stat-card {% if current_filter == 'Closed' %}active{% endif %}"
-                onclick="filterByStatus('Closed')">
-                <div class="stat-icon-wrapper bg-emerald-light text-emerald">
-                    <i class="ph ph-check-circle"></i>
-                </div>
-                <div class="stat-content">
-                    <div class="stat-value text-emerald">{{ counts.Closed }}</div>
-                    <div class="stat-label">Closed</div>
-                    <div class="stat-trend good">Completed</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Section: Requests List -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="ph ph-list-dashes"></i>
-                    <span>All Requests</span>
-                    {% if current_filter != 'All' %}
-                    <span class="badge"
-                        style="background: var(--surface-100); color: var(--text-secondary); margin-left: 0.5rem;">
-                        {{ current_filter }}
-                    </span>
-                    {% endif %}
+                        <a href="{{ url_for('import_request') }}" class="btn btn-primary">
+                            <i class="ph ph-plus"></i>
+                            <span>New Request</span>
+                        </a>
+                    </div>
                 </div>
 
-                <div class="header-actions" style="display: flex; gap: 1rem;">
-                    <!-- Actions -->
-                    <form class="search-global" method="GET" action="{{ url_for('dashboard') }}">
-                        <input type="hidden" name="status" value="{{ current_filter }}">
-                        <i class="ph ph-magnifying-glass"></i>
-                        <input type="text" name="search" placeholder="Search requests..." value="{{ search_query }}">
-                    </form>
-
-                    <a href="{{ url_for('import_request') }}" class="btn btn-primary">
-                        <i class="ph ph-plus"></i>
-                        <span>New Request</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="table-container">
+                <div class="table-container">
                 {% if requests %}
                 <table class="data-table">
                     <thead>
                         <tr>
+                            {% if current_user and current_user.role == 'admin' %}
+                            <th style="width: 40px; padding-left: 12px;">
+                                <input type="checkbox" id="bulk-select-all" onclick="BulkOps.toggleAll(this)" title="Select all" style="cursor:pointer; width:16px; height:16px; accent-color: var(--agilent-blue);">
+                            </th>
+                            {% endif %}
                             <th style="width: 120px;">Reference</th>
                             <th>Subject</th>
                             <th>Status</th>
@@ -119,6 +127,11 @@
                     <tbody>
                         {% for req in requests %}
                         <tr data-request-key="{{ req.request_key }}" style="cursor: pointer;">
+                            {% if current_user and current_user.role == 'admin' %}
+                            <td style="padding-left: 12px;" onclick="event.stopPropagation();">
+                                <input type="checkbox" class="bulk-cb" value="{{ req.request_key }}" onclick="BulkOps.updateCount()" style="cursor:pointer; width:16px; height:16px; accent-color: var(--agilent-blue);">
+                            </td>
+                            {% endif %}
                             <td>
                                 <span class="ref-code">{{ req.request_key }}</span>
                             </td>
@@ -151,7 +164,16 @@
                             <td>
                                 {% if req.assigned_to %}
                                 <div class="assigned-chip">
-                                    {{ req.assigned_to.split('@')[0] }}
+                                    {% set ns = namespace(found=false) %}
+                                    {% for user in staff_users %}
+                                        {% if user.email == req.assigned_to %}
+                                            {{ user.name }}
+                                            {% set ns.found = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not ns.found %}
+                                        {{ req.assigned_to.split('@')[0] }}
+                                    {% endif %}
                                 </div>
                                 {% else %}
                                 <span class="text-muted text-sm">-</span>
@@ -184,6 +206,140 @@
             </div>
         </div>
 
+        <!-- Filters Panel -->
+        <div id="filter-panel" class="card" style="width: 280px; flex-shrink: 0; display: {% if statuses or owners or start_date or end_date %}block{% else %}none{% endif %};">
+            <form id="filter-form" method="GET" action="{{ url_for('dashboard') }}">
+                <input type="hidden" name="status" value="{{ current_filter }}">
+                <!-- Search input is bound to this form via form="filter-form" attr -->
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="font-weight: 600; font-size: 1rem;">Filters</h3>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; color: var(--text-secondary); cursor: pointer; user-select: none;" title="Auto-apply filters when a checkbox or date changes">
+                            <span id="auto-apply-label-text">Auto Apply</span>
+                            <div id="auto-apply-toggle" onclick="FilterPanel.toggleAutoApply()" style="width: 32px; height: 18px; border-radius: 9px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;">
+                                <div id="auto-apply-knob" style="width: 14px; height: 14px; border-radius: 50%; background: white; position: absolute; top: 2px; transition: left 0.2s;"></div>
+                            </div>
+                        </label>
+                        <button type="button" onclick="document.getElementById('filter-panel').style.display = 'none';" style="background: none; border: none; cursor: pointer; color: var(--text-tertiary);">
+                            <i class="ph ph-x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div style="margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem;">
+                        <span>Status</span>
+                        <i class="ph ph-caret-up"></i>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="statuses" value="Open" {% if statuses and 'Open' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            Open
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="statuses" value="Pending" {% if statuses and 'Pending' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            Pending
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="statuses" value="Closed" {% if statuses and 'Closed' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            Closed
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Owner -->
+                <div style="margin-bottom: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem;">
+                        <span>Owner</span>
+                        <i class="ph ph-caret-up"></i>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="owners" value="Assigned" {% if owners and 'Assigned' in owners %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            Assigned
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="owners" value="Unassigned" {% if owners and 'Unassigned' in owners %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            Unassigned
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Date Range -->
+                <div style="margin-bottom: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-weight: 500; font-size: 0.9rem;">
+                        <span>Date Range</span>
+                        <i class="ph ph-caret-up"></i>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Start Date</label>
+                            <div style="position: relative;">
+                                <input type="date" name="start_date" value="{{ start_date or '' }}" style="width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">End Date</label>
+                            <div style="position: relative;">
+                                <input type="date" name="end_date" value="{{ end_date or '' }}" style="width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+                    <a href="{{ url_for('dashboard', status=current_filter, search=search_query) }}" class="btn btn-secondary" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; text-align: center;">Clear All</a>
+                    <button type="submit" class="btn btn-primary" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+        {% if current_user and current_user.role == 'admin' %}
+        <!-- Bulk Action Bar (Admin Only) -->
+        <div id="bulk-action-bar" style="display:none; position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); z-index:100; background:var(--surface-800,#1e293b); color:#fff; border-radius:14px; padding:0.65rem 1.25rem; box-shadow:0 8px 32px rgba(0,0,0,0.25); display:none; align-items:center; gap:1rem; font-size:0.85rem; min-width:420px;">
+            <span style="font-weight:700; white-space:nowrap;"><span id="bulk-count">0</span> selected</span>
+            <span style="width:1px; height:24px; background:rgba(255,255,255,0.2);"></span>
+
+            <!-- Status -->
+            <div style="position:relative;">
+                <button onclick="BulkOps.toggleDropdown('status')" class="bulk-bar-btn" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:0.4rem 0.75rem; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.35rem;">
+                    <i class="ph ph-swap"></i> Status <i class="ph ph-caret-down" style="font-size:0.7rem;"></i>
+                </button>
+                <div id="bulk-dropdown-status" style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); min-width:240px; overflow:hidden; z-index:101;">
+                    {% for st in ['New - Open','Waiting - Approval needed','Waiting - Information needed','Waiting - for Support','Waiting - Answered','Waiting - Institution clarification','Closed - Resolved','Closed - Customer unresponsive','Closed - Other'] %}
+                    <button onclick="BulkOps.changeStatus('{{ st }}')" style="display:block; width:100%; text-align:left; padding:0.55rem 1rem; border:none; background:none; cursor:pointer; font-size:0.8rem; color:var(--text-primary); font-weight:500;" onmouseover="this.style.background='var(--surface-50)'" onmouseout="this.style.background='none'">{{ st }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Owner -->
+            <div style="position:relative;">
+                <button onclick="BulkOps.toggleDropdown('owner')" class="bulk-bar-btn" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:0.4rem 0.75rem; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.35rem;">
+                    <i class="ph ph-user-switch"></i> Owner <i class="ph ph-caret-down" style="font-size:0.7rem;"></i>
+                </button>
+                <div id="bulk-dropdown-owner" style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); min-width:220px; overflow:hidden; z-index:101;">
+                    <button onclick="BulkOps.changeOwner('')" style="display:block; width:100%; text-align:left; padding:0.55rem 1rem; border:none; background:none; cursor:pointer; font-size:0.8rem; color:var(--text-secondary); font-style:italic;" onmouseover="this.style.background='var(--surface-50)'" onmouseout="this.style.background='none'">Unassign</button>
+                    {% for staff in staff_users %}
+                    <button onclick="BulkOps.changeOwner('{{ staff.email }}')" style="display:block; width:100%; text-align:left; padding:0.55rem 1rem; border:none; background:none; cursor:pointer; font-size:0.8rem; color:var(--text-primary); font-weight:500;" onmouseover="this.style.background='var(--surface-50)'" onmouseout="this.style.background='none'">{{ staff.name }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <span style="width:1px; height:24px; background:rgba(255,255,255,0.2);"></span>
+
+            <!-- Delete -->
+            <button onclick="BulkOps.deleteSelected()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; padding:0.4rem 0.75rem; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.35rem;">
+                <i class="ph ph-trash"></i> Delete
+            </button>
+
+            <!-- Cancel -->
+            <button onclick="BulkOps.clearAll()" style="background:none; border:none; color:rgba(255,255,255,0.5); cursor:pointer; font-size:0.8rem; font-weight:600; padding:0.4rem 0.5rem;">Cancel</button>
+        </div>
+        {% endif %}
+
     </div>
     <!-- Dynamic tab contents will be added here by JavaScript -->
 </div>
@@ -192,9 +348,142 @@
     function filterByStatus(status) {
         const url = new URL(window.location.href);
         url.searchParams.set('status', status);
-        url.hash = ''; // Clear hash when filtering
+        // Clear panel statuses so the category filter isn't overridden on stat-card click
+        url.searchParams.delete('statuses');
+        url.hash = '';
         window.location.href = url.toString();
     }
+
+    const FilterPanel = {
+        autoApply: true,
+
+        init() {
+            this.autoApply = localStorage.getItem('filterAutoApply') !== 'false';
+            this.updateToggleUI();
+            this.bindListeners();
+        },
+
+        bindListeners() {
+            document.querySelectorAll('#filter-form input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    if (this.autoApply) document.getElementById('filter-form').submit();
+                });
+            });
+            document.querySelectorAll('#filter-form input[type="date"]').forEach(d => {
+                d.addEventListener('change', () => {
+                    if (this.autoApply) document.getElementById('filter-form').submit();
+                });
+            });
+        },
+
+        toggleAutoApply() {
+            this.autoApply = !this.autoApply;
+            localStorage.setItem('filterAutoApply', this.autoApply ? 'true' : 'false');
+            this.updateToggleUI();
+        },
+
+        updateToggleUI() {
+            const toggle = document.getElementById('auto-apply-toggle');
+            const knob = document.getElementById('auto-apply-knob');
+            if (!toggle || !knob) return;
+            if (this.autoApply) {
+                toggle.style.background = 'var(--brand-primary, #0057b8)';
+                knob.style.left = '16px';
+            } else {
+                toggle.style.background = 'var(--text-tertiary, #9ca3af)';
+                knob.style.left = '2px';
+            }
+        }
+    };
+
+    // Bulk Operations (Admin Only)
+    const BulkOps = {
+        getSelected() {
+            return [...document.querySelectorAll('.bulk-cb:checked')].map(cb => cb.value);
+        },
+        updateCount() {
+            const keys = this.getSelected();
+            const bar = document.getElementById('bulk-action-bar');
+            const counter = document.getElementById('bulk-count');
+            if (!bar) return;
+            if (keys.length > 0) {
+                bar.style.display = 'flex';
+                counter.textContent = keys.length;
+            } else {
+                bar.style.display = 'none';
+                this.closeDropdowns();
+            }
+        },
+        toggleAll(masterCb) {
+            document.querySelectorAll('.bulk-cb').forEach(cb => cb.checked = masterCb.checked);
+            this.updateCount();
+        },
+        clearAll() {
+            document.querySelectorAll('.bulk-cb').forEach(cb => cb.checked = false);
+            const master = document.getElementById('bulk-select-all');
+            if (master) master.checked = false;
+            this.updateCount();
+            this.closeDropdowns();
+        },
+        toggleDropdown(name) {
+            const el = document.getElementById(`bulk-dropdown-${name}`);
+            const other = name === 'status' ? 'owner' : 'status';
+            const otherEl = document.getElementById(`bulk-dropdown-${other}`);
+            if (otherEl) otherEl.style.display = 'none';
+            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        },
+        closeDropdowns() {
+            ['status', 'owner'].forEach(n => {
+                const el = document.getElementById(`bulk-dropdown-${n}`);
+                if (el) el.style.display = 'none';
+            });
+        },
+        async changeStatus(status) {
+            const keys = this.getSelected();
+            if (!keys.length) return;
+            this.closeDropdowns();
+            if (!confirm(`Change status to "${status}" for ${keys.length} ticket(s)?`)) return;
+            const res = await fetch('/other/api/bulk/status', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({request_keys: keys, status})
+            });
+            const data = await res.json();
+            if (data.success) location.reload();
+            else alert(data.error || 'Failed');
+        },
+        async changeOwner(email) {
+            const keys = this.getSelected();
+            if (!keys.length) return;
+            this.closeDropdowns();
+            const label = email || 'Unassigned';
+            if (!confirm(`Assign ${keys.length} ticket(s) to "${label}"?`)) return;
+            const res = await fetch('/other/api/bulk/assign', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({request_keys: keys, assignee: email})
+            });
+            const data = await res.json();
+            if (data.success) location.reload();
+            else alert(data.error || 'Failed');
+        },
+        async deleteSelected() {
+            const keys = this.getSelected();
+            if (!keys.length) return;
+            this.closeDropdowns();
+            if (!confirm(`⚠️ Permanently delete ${keys.length} ticket(s)?\n\n${keys.join(', ')}\n\nThis cannot be undone.`)) return;
+            const res = await fetch('/other/api/bulk/delete', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({request_keys: keys})
+            });
+            const data = await res.json();
+            if (data.success) location.reload();
+            else alert(data.error || 'Failed');
+        }
+    };
+
+    // Close bulk dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#bulk-action-bar')) BulkOps.closeDropdowns();
+    });
 
     // Tab Manager
     const TabManager = {
@@ -368,9 +657,10 @@
         }
     };
 
-    // Initialize tab manager on page load
+    // Initialize tab manager and filter panel on page load
     document.addEventListener('DOMContentLoaded', () => {
         TabManager.init();
+        FilterPanel.init();
     });
 
     // Modify table row clicks to open tabs instead of navigating

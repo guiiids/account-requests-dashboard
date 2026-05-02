@@ -22,6 +22,7 @@ VALID_STATUSES = [
     'New - Open'
 ]
 
+
 def get_db_path():
     """Get absolute path to the database file.
     Uses DB_PATH env var if set (for Azure persistent mount), otherwise
@@ -29,14 +30,17 @@ def get_db_path():
     """
     custom_path = os.environ.get('DB_PATH')
     if custom_path:
+        os.makedirs(os.path.dirname(custom_path), exist_ok=True)
         return custom_path
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), DB_NAME)
+
 
 def get_connection():
     """Get a connection to the SQLite database."""
     conn = sqlite3.connect(get_db_path())
     conn.row_factory = sqlite3.Row  # Return rows as dict-like objects
     return conn
+
 
 @contextmanager
 def get_db():
@@ -46,6 +50,7 @@ def get_db():
         yield conn
     finally:
         conn.close()
+
 
 def init_db():
     """Initialize database tables."""
@@ -202,7 +207,7 @@ def migrate_db():
         c.execute("UPDATE requests SET status = 'New - Open' WHERE status = 'Open'")
         c.execute("UPDATE requests SET status = 'Waiting - for Support' WHERE status = 'In Progress'")
         c.execute("UPDATE requests SET status = 'Closed - Resolved' WHERE status = 'Closed'")
-        
+
         conn.commit()
 
 
@@ -290,26 +295,57 @@ _CATEGORY_PREFIXES = {
 }
 
 
-def get_all_requests(status_filter=None, search_query=None):
+def get_all_requests(status_filter=None, search_query=None, statuses=None, owners=None, start_date=None, end_date=None):
     """
     Get all requests, optionally filtered by status and/or search query.
     Supports both category filters ('New', 'Waiting', 'Closed') via
     prefix matching and exact status filters ('New - Open').
+    Also supports lists of statuses (Open, Pending, Closed mapping to New, Waiting, Closed),
+    owners (Assigned, Unassigned), and a date range.
     Returns newest first.
     """
     query = 'SELECT * FROM requests WHERE 1=1'
     params = []
 
-    if status_filter and status_filter != 'All':
+    # Only apply the stat-card category filter when the panel's statuses aren't active
+    # (panel statuses override the category filter to avoid empty-result conflicts)
+    if status_filter and status_filter != 'All' and not statuses:
         prefix = _CATEGORY_PREFIXES.get(status_filter)
         if prefix:
-            # Category filter — use LIKE for prefix match
             query += ' AND status LIKE ?'
             params.append(prefix)
         else:
-            # Exact status filter (e.g., 'New - Open')
             query += ' AND status = ?'
             params.append(status_filter)
+
+    if statuses:
+        status_conditions = []
+        for s in statuses:
+            if s == 'Open':
+                status_conditions.append("status LIKE 'New%'")
+            elif s == 'Pending':
+                status_conditions.append("status LIKE 'Waiting%'")
+            elif s == 'Closed':
+                status_conditions.append("status LIKE 'Closed%'")
+        if status_conditions:
+            query += ' AND (' + ' OR '.join(status_conditions) + ')'
+
+    if owners:
+        owner_conditions = []
+        if 'Assigned' in owners:
+            owner_conditions.append("assigned_to IS NOT NULL")
+        if 'Unassigned' in owners:
+            owner_conditions.append("assigned_to IS NULL")
+        if owner_conditions:
+            query += ' AND (' + ' OR '.join(owner_conditions) + ')'
+
+    if start_date:
+        query += ' AND created_at >= ?'
+        params.append(start_date + ' 00:00:00')
+
+    if end_date:
+        query += ' AND created_at <= ?'
+        params.append(end_date + ' 23:59:59')
 
     if search_query:
         query += ' AND (requester_email LIKE ? OR requester_name LIKE ? OR request_key LIKE ?)'
@@ -439,7 +475,7 @@ def get_comments_for_request(request_key):
 
 def get_request_counts():
     """Get counts by status category for dashboard display.
-    
+
     Buckets match the prefix-based category system:
     New (status starts with 'New'), Waiting ('Waiting'), Closed ('Closed').
     """
@@ -485,6 +521,7 @@ _SEED_STAFF = [
     {'email': 'nadia.clark@agilent.com', 'name': 'Nadia Clark'},
     {'email': 'william.lai@agilent.com', 'name': 'William Lai'},
     {'email': 'elvira.carrera@agilent.com', 'name': 'Elvira Carrera'},
+    {'email': 'sook-theng.chow@agilent.com', 'name': 'Sook-Theng Chow'},
     {'email': 'vinod.rajendran@agilent.com', 'name': 'Vinod Rajendran'},
     {'email': 'guilherme.vieira-machado@agilent.com', 'name': 'Guilherme Vieira-Machado'},
 ]
@@ -654,3 +691,67 @@ def must_change_password(email):
                   (email.lower().strip(),))
         row = c.fetchone()
     return bool(row and row['must_change_password'])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bulk Operations (Admin only — enforced at route level)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def delete_requests(request_keys):
+    """Delete one or more requests and their comments. Returns count deleted."""
+    if not request_keys:
+        return 0
+    placeholders = ','.join('?' for _ in request_keys)
+    with get_db() as conn:
+        c = conn.cursor()
+        # Get IDs for cascade delete of comments
+        c.execute(f'SELECT id FROM requests WHERE request_key IN ({placeholders})', request_keys)
+        ids = [r['id'] for r in c.fetchall()]
+        if ids:
+            id_ph = ','.join('?' for _ in ids)
+            c.execute(f'DELETE FROM request_comments WHERE request_id IN ({id_ph})', ids)
+        c.execute(f'DELETE FROM requests WHERE request_key IN ({placeholders})', request_keys)
+        deleted = c.rowcount
+        conn.commit()
+    return deleted
+
+
+def bulk_update_status(request_keys, new_status):
+    """Update status for multiple requests. Returns count updated."""
+    if not request_keys or new_status not in VALID_STATUSES:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    placeholders = ','.join('?' for _ in request_keys)
+    with get_db() as conn:
+        c = conn.cursor()
+        if new_status.startswith('Closed'):
+            c.execute(f'''
+                UPDATE requests SET status = ?, updated_at = ?, closed_at = ?
+                WHERE request_key IN ({placeholders})
+            ''', [new_status, now, now] + list(request_keys))
+        else:
+            c.execute(f'''
+                UPDATE requests SET status = ?, updated_at = ?, closed_at = NULL
+                WHERE request_key IN ({placeholders})
+            ''', [new_status, now] + list(request_keys))
+        updated = c.rowcount
+        conn.commit()
+    return updated
+
+
+def bulk_assign(request_keys, assignee_email):
+    """Assign multiple requests to a staff member. Returns count updated."""
+    if not request_keys:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    assignee = assignee_email.lower().strip() if assignee_email else None
+    placeholders = ','.join('?' for _ in request_keys)
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute(f'''
+            UPDATE requests SET assigned_to = ?, updated_at = ?
+            WHERE request_key IN ({placeholders})
+        ''', [assignee, now] + list(request_keys))
+        updated = c.rowcount
+        conn.commit()
+    return updated

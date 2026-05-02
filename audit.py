@@ -26,6 +26,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
 import database
 
@@ -40,11 +41,11 @@ def log_audit_event(
     actor_email: str,
     action: str,
     *,
-    target_type: str | None = None,
-    target_id: str | None = None,
-    details: dict | None = None,
+    target_type: Optional[str] = None,
+    target_id: Optional[str] = None,
+    details: Optional[dict] = None,
     success: bool = True,
-    actor_ip: str | None = None,
+    actor_ip: Optional[str] = None,
 ) -> None:
     """
     Write one audit record to the ``audit_log`` table.
@@ -110,11 +111,11 @@ def log_audit_event(
 # ---------------------------------------------------------------------------
 
 def get_audit_log(
-    actor_email: str | None = None,
-    target_id: str | None = None,
-    action_prefix: str | None = None,
+    actor_email: Optional[str] = None,
+    target_id: Optional[str] = None,
+    action_prefix: Optional[str] = None,
     limit: int = 200,
-) -> list[dict]:
+) -> List[dict]:
     """
     Return audit log entries, newest first, with optional filters.
 
@@ -183,7 +184,7 @@ def get_audit_log_for_agent(actor_email: str, limit: int = 100) -> list[dict]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _get_request_ip() -> str | None:
+def _get_request_ip() -> Optional[str]:
     """
     Safely extract the client IP from the current Flask request context.
     Returns ``None`` when called outside a request context.

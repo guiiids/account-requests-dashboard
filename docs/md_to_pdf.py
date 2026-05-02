@@ -32,17 +32,18 @@ from weasyprint import HTML
 # We transform them into styled alert boxes after HTML conversion.
 
 ALERT_META = {
-    "NOTE":      {"icon": "ℹ️",  "color": "#1d76db", "bg": "#dbeafe", "border": "#3b82f6", "title_color": "#1e40af"},
-    "TIP":       {"icon": "💡", "color": "#1a7f37", "bg": "#dcfce7", "border": "#22c55e", "title_color": "#166534"},
+    "NOTE": {"icon": "ℹ️", "color": "#1d76db", "bg": "#dbeafe", "border": "#3b82f6", "title_color": "#1e40af"},
+    "TIP": {"icon": "💡", "color": "#1a7f37", "bg": "#dcfce7", "border": "#22c55e", "title_color": "#166534"},
     "IMPORTANT": {"icon": "❗", "color": "#8250df", "bg": "#f3e8ff", "border": "#a855f7", "title_color": "#6b21a8"},
-    "WARNING":   {"icon": "⚠️",  "color": "#9a6700", "bg": "#fef9c3", "border": "#eab308", "title_color": "#854d0e"},
-    "CAUTION":   {"icon": "🔴", "color": "#cf222e", "bg": "#fee2e2", "border": "#ef4444", "title_color": "#991b1b"},
+    "WARNING": {"icon": "⚠️", "color": "#9a6700", "bg": "#fef9c3", "border": "#eab308", "title_color": "#854d0e"},
+    "CAUTION": {"icon": "🔴", "color": "#cf222e", "bg": "#fee2e2", "border": "#ef4444", "title_color": "#991b1b"},
 }
 
 ALERT_PATTERN = re.compile(
     r'<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*<br\s*/?>\s*',
     re.IGNORECASE,
 )
+
 
 def _replace_alert(match):
     """Replace a matched GitHub alert blockquote opening with styled HTML."""
@@ -86,15 +87,15 @@ def transform_mermaid_blocks(html: str) -> str:
         labels = re.findall(r'\["([^"]+)"\]', code)
         if not labels:
             labels = re.findall(r'"([^"]+)"', code)
-        
+
         # Build a simple text description from the mermaid content
         desc_lines = []
         for label in labels:
             clean = label.replace("\\n", " · ")
             desc_lines.append(f"<li>{clean}</li>")
-        
+
         items_html = "\n".join(desc_lines) if desc_lines else "<li>(Diagram)</li>"
-        
+
         return (
             '<div style="background:linear-gradient(135deg, #f0f4ff, #e8eeff); '
             'border:1.5px solid #c7d2fe; border-radius:10px; padding:16px 20px; '
@@ -108,7 +109,7 @@ def transform_mermaid_blocks(html: str) -> str:
             f'line-height:1.7; margin:0; padding-left:20px;">{items_html}</ul>'
             '</div>'
         )
-    
+
     # Match ```mermaid ... ``` blocks (already converted to <pre><code>)
     html = re.sub(
         r'<pre><code\s+class="mermaid">(.*?)</code></pre>',
@@ -410,7 +411,7 @@ def convert_markdown_to_pdf(md_file: str, pdf_file: str) -> None:
     # Render to PDF — base_url allows resolving relative image paths
     base_url = os.path.dirname(os.path.abspath(md_file))
     HTML(string=html_doc, base_url=base_url).write_pdf(pdf_file)
-    
+
     size_kb = os.path.getsize(pdf_file) / 1024
     print(f"✅  PDF saved → {pdf_file}  ({size_kb:.0f} KB)")
 

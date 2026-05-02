@@ -879,8 +879,8 @@ a {
 .tab-bar {
   background: var(--surface-0);
   border-bottom: 1px solid var(--border-color);
-  margin: -2rem -2rem 2rem -2rem;
-  /* Negate page-container padding to span full width */
+  margin: 0 -2rem 2rem -2rem;
+  /* Negate page-container padding to span full width on sides */
   padding: 0 2rem;
   position: sticky;
   top: 64px;

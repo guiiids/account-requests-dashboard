@@ -1,5 +1,5 @@
 # notification_util.py
-import concurrent
+import concurrent.futures
 import json
 import logging
 import os
@@ -16,6 +16,8 @@ import urllib3
 logger = logging.getLogger(__name__)
 
 # Disable SSL warnings for local dev (corporate proxy issues)
+
+
 def _get_ssl_verify():
     """Returns False only when explicitly running in a local/dev environment."""
     env = os.environ.get('FLASK_ENV', '').lower()
@@ -27,6 +29,7 @@ def _get_ssl_verify():
         return False
     return True
 
+
 def send_message_in_teams(payload, teams_webhook_url=None):
     """
     Sends a message to a Microsoft Teams channel via webhook.
@@ -35,6 +38,7 @@ def send_message_in_teams(payload, teams_webhook_url=None):
         notify_via_webhook(payload, teams_webhook_url)
     else:
         logger.info("No webhook URL provided. Failed to send message.")
+
 
 def notify_via_webhook(payload, webhook_url=None):
     """
@@ -55,16 +59,18 @@ def notify_via_webhook(payload, webhook_url=None):
     else:
         logger.info("No webhook URL provided. Failed to send payload.")
 
+
 def send_email_using_powerautomate(subject, body, to_list=None, power_automate_webhook_url=None):
     """
     Sends an email using Power Automate via webhook.
     """
-    payload = {"RecipientEmail": ', '.join(to_list), "Subject": subject, "BodyContent": body}
+    payload = {"RecipientEmail": ', '.join(to_list or []), "Subject": subject, "BodyContent": body}
     if power_automate_webhook_url:
 
         notify_via_webhook(payload, power_automate_webhook_url)
     else:
         logger.info("No Power Automate webhook URL provided. Failed to send email.")
+
 
 def send_email(subject, payload, to_list=None, is_adaptive_card=False):
     """
@@ -92,22 +98,22 @@ def send_email(subject, payload, to_list=None, is_adaptive_card=False):
 
         # Load email config from environment
         from_email = os.environ.get("SMTP_FROM_EMAIL", "noreply@agilent.com")
-        #app_password = os.environ.get("SMTP_APP_PASSWORD")
-        smtp_server = os.environ.get("SMTP_SERVER", "smtp-relay.agilent.com") # Default guess, can be overridden
+        # app_password = os.environ.get("SMTP_APP_PASSWORD")
+        smtp_server = os.environ.get("SMTP_SERVER", "smtp-relay.agilent.com")  # Default guess, can be overridden
         smtp_port = int(os.environ.get("SMTP_PORT", 25))
-        #smtp_secure = bool(os.environ.get("SMTP_SECURE", True))
+        # smtp_secure = bool(os.environ.get("SMTP_SECURE", True))
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = from_email
-        msg["To"] = ', '.join(to_list)
+        msg["To"] = ', '.join(to_list or [])
         msg.attach(MIMEText(html, "html"))
 
         # Connect to SMTP server
 
-        if smtp_server and smtp_port and from_email and to_list :
+        if smtp_server and smtp_port and from_email and to_list:
             server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-            
+
             # Use EHLO
             server.ehlo()
 
@@ -139,6 +145,7 @@ def send_email(subject, payload, to_list=None, is_adaptive_card=False):
     except Exception as e:
         logger.info(f"An error occurred: {e}")
         raise e
+
 
 def build_adaptive_card_payload(card_data: dict) -> dict:
     """
@@ -202,6 +209,7 @@ def build_adaptive_card_payload(card_data: dict) -> dict:
     }
     return payload
 
+
 def build_health_check_card_data(message):
     """
     Builds card data for health check notifications.
@@ -259,6 +267,7 @@ def build_health_check_card_data(message):
     }
     return card_data
 
+
 def build_log_record_card_data(log_records_with_count: list):
     """
     Builds card data for a batch of log record notifications.
@@ -269,7 +278,7 @@ def build_log_record_card_data(log_records_with_count: list):
     if len(log_records_with_count) > 1 or list(log_records_with_count)[0][1] > 0:
         title = "📢 Batch Log Alerts in SAGE"
         timestamp_label = "Last Reported Time Stamp"
-    for log_record,count in log_records_with_count:
+    for log_record, count in log_records_with_count:
         # Add a separator for log records
         fields.append({"is_separator": True})
         fields.append({"label": "Logger", "value": log_record.name})
@@ -287,6 +296,7 @@ def build_log_record_card_data(log_records_with_count: list):
         "title": title,
         "fields": fields
     }
+
 
 def send_notification(notification_template: 'NotificationTemplate'):
     """
@@ -320,7 +330,7 @@ def send_notification(notification_template: 'NotificationTemplate'):
 
         # Teams notification task
         if "teams" in payload["notification_type"] and payload["teams_to_list"]:
-            session = requests.Session()
+
             def send_teams():
                 for teams_webhook in payload["teams_to_list"]:
                     logger.info("Sending Teams notification through webhook")
@@ -354,6 +364,7 @@ class NotificationTemplate:
     Template class for notification configuration.
     Determines recipients and notification types from environment variables.
     """
+
     def __init__(self, notification_payload, is_adaptive_card=False, is_email=True, is_teams=False):
         self.notification_payload = notification_payload
         self.is_adaptive_card = is_adaptive_card
