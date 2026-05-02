@@ -53,13 +53,83 @@ const RequestActions = {
     },
 
     /**
-     * Update request status
-     * @param {string} requestKey 
-     * @param {string} status 
+     * Open the close-ticket confirmation modal
+     * @param {string} requestKey
+     */
+    confirmClose(requestKey) {
+        const modal = document.getElementById(`close-confirm-modal-${requestKey}`);
+        if (modal) modal.classList.add('active');
+    },
+
+    /**
+     * Dismiss the close-ticket confirmation modal
+     * @param {string} requestKey
+     */
+    dismissCloseConfirm(requestKey) {
+        const modal = document.getElementById(`close-confirm-modal-${requestKey}`);
+        if (modal) modal.classList.remove('active');
+    },
+
+    /**
+     * Submit the close confirmation — reads the chosen reason and calls updateStatus
+     * @param {string} requestKey
+     */
+    async submitCloseConfirm(requestKey) {
+        const select = document.getElementById(`close-reason-${requestKey}`);
+        const reason = select ? select.value : 'Closed - Resolved';
+        this.dismissCloseConfirm(requestKey);
+        await this.updateStatus(requestKey, reason);
+    },
+
+    /**
+     * Update request status with loading state, optimistic UI, and delayed reload
+     * @param {string} requestKey
+     * @param {string} status
      */
     async updateStatus(requestKey, status) {
-        const success = await this.apiCall(`/other/api/request/${requestKey}/status`, { status }, requestKey);
-        if (success) showToast(`Status updated to "${status}"`);
+        // Find the close/reopen button to show loading state
+        const btn = document.getElementById(`action-btn-${requestKey}`);
+        let originalHtml = null;
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph-bold ph-circle-notch" style="display:inline-block;animation:spin 0.8s linear infinite"></i> Updating...';
+        }
+
+        const success = await this.apiCall(
+            `/other/api/request/${requestKey}/status`,
+            { status },
+            requestKey,
+            true  // suppress auto-reload — we handle it below
+        );
+
+        if (success) {
+            // Optimistic: update the status pill in the dropdown trigger immediately
+            const displayEl = document.getElementById(`status-display-${requestKey}`);
+            if (displayEl) displayEl.textContent = status;
+            const dotEl = document.querySelector(`#status-trigger-${requestKey} .option-dot`);
+            if (dotEl) {
+                dotEl.className = 'option-dot ' +
+                    (status.startsWith('Waiting') ? 'dot-progress' :
+                     status.startsWith('Closed')  ? 'dot-closed'   : 'dot-open');
+            }
+
+            // Show persistent banner and toast
+            showStatusBanner(requestKey, status);
+            showToast(`Status updated to "${status}"`, 'success', 4000);
+
+            // Reload after a short pause so the user sees the feedback
+            setTimeout(() => {
+                if (window.TabManager) window.TabManager.reloadTab(requestKey);
+                else location.reload();
+            }, 2200);
+        } else {
+            // Restore button on failure
+            if (btn && originalHtml !== null) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
     },
 
     /**
@@ -194,8 +264,12 @@ const RequestActions = {
 
     /**
      * Generic API call helper
+     * @param {string}  url
+     * @param {object}  data
+     * @param {string}  requestKey
+     * @param {boolean} suppressReload - when true the caller controls reload timing
      */
-    async apiCall(url, data, requestKey) {
+    async apiCall(url, data, requestKey, suppressReload = false) {
         try {
             const res = await fetch(url, {
                 method: 'POST',
@@ -204,10 +278,9 @@ const RequestActions = {
             });
 
             if (res.ok) {
-                if (window.TabManager) {
-                    window.TabManager.reloadTab(requestKey);
-                } else {
-                    location.reload();
+                if (!suppressReload) {
+                    if (window.TabManager) window.TabManager.reloadTab(requestKey);
+                    else location.reload();
                 }
                 return true;
             } else {
@@ -222,20 +295,21 @@ const RequestActions = {
     }
 };
 
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', duration = 3000) {
     const toast = document.createElement('div');
     toast.style.cssText = [
         'position:fixed', 'bottom:1.5rem', 'right:1.5rem', 'z-index:9999',
         'display:flex', 'align-items:center', 'gap:0.6rem',
-        'padding:0.7rem 1.1rem', 'border-radius:0.75rem',
-        'box-shadow:0 8px 24px rgba(0,0,0,0.18)',
-        'font-size:0.875rem', 'font-weight:600', 'color:#fff',
-        'transition:opacity 0.3s,transform 0.3s',
-        'opacity:0', 'transform:translateY(0.5rem)'
+        'padding:0.75rem 1.2rem', 'border-radius:0.875rem',
+        'box-shadow:0 8px 32px rgba(0,0,0,0.22)',
+        'font-size:0.875rem', 'font-weight:700', 'color:#fff',
+        'transition:opacity 0.35s,transform 0.35s',
+        'opacity:0', 'transform:translateY(0.75rem)',
+        'max-width:360px'
     ].join(';');
     toast.style.backgroundColor = type === 'success' ? '#16a34a' : '#dc2626';
     const icon = type === 'success' ? 'ph-check-circle' : 'ph-x-circle';
-    toast.innerHTML = `<i class="ph-bold ${icon}" style="font-size:1.1rem"></i>${message}`;
+    toast.innerHTML = `<i class="ph-bold ${icon}" style="font-size:1.2rem;flex-shrink:0"></i>${message}`;
     document.body.appendChild(toast);
 
     requestAnimationFrame(() => {
@@ -245,10 +319,65 @@ function showToast(message, type = 'success') {
 
     setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(0.5rem)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+        toast.style.transform = 'translateY(0.75rem)';
+        setTimeout(() => toast.remove(), 350);
+    }, duration);
 }
+
+/**
+ * Show a persistent in-page status-change banner inside the ticket sidebar.
+ * It fades out just before the tab reloads.
+ * @param {string} requestKey
+ * @param {string} status
+ */
+function showStatusBanner(requestKey, status) {
+    const bannerId = `status-banner-${requestKey}`;
+    // Remove any existing banner first
+    const existing = document.getElementById(bannerId);
+    if (existing) existing.remove();
+
+    const isClosed  = status.startsWith('Closed');
+    const isWaiting = status.startsWith('Waiting');
+    const color = isClosed ? '#16a34a' : isWaiting ? '#d97706' : '#0057b8';
+    const bg    = isClosed ? '#f0fdf4'  : isWaiting ? '#fffbeb' : '#eff6ff';
+    const border = isClosed ? '#bbf7d0' : isWaiting ? '#fde68a' : '#bfdbfe';
+    const icon  = isClosed ? 'ph-check-circle' : isWaiting ? 'ph-clock' : 'ph-arrow-circle-up';
+
+    const banner = document.createElement('div');
+    banner.id = bannerId;
+    banner.style.cssText = [
+        `background:${bg}`, `border:1.5px solid ${border}`, `color:${color}`,
+        'border-radius:10px', 'padding:0.6rem 0.875rem',
+        'display:flex', 'align-items:center', 'gap:0.5rem',
+        'font-size:0.8rem', 'font-weight:700',
+        'transition:opacity 0.5s', 'opacity:0',
+        'margin-bottom:0.625rem'
+    ].join(';');
+    banner.innerHTML = `
+        <i class="ph-bold ${icon}" style="font-size:1rem;flex-shrink:0"></i>
+        <span>Status set to <strong>${status}</strong> — refreshing…</span>
+    `;
+
+    // Insert the banner before the first quick-action button
+    const actionsDiv = document.querySelector(`#action-btn-${requestKey}`)?.closest('div[style]');
+    if (actionsDiv) {
+        actionsDiv.insertBefore(banner, actionsDiv.firstChild);
+    }
+
+    requestAnimationFrame(() => { banner.style.opacity = '1'; });
+
+    // Fade out ~300ms before the reload fires (2200ms)
+    setTimeout(() => { banner.style.opacity = '0'; }, 1900);
+}
+
+/* Keyframe for spinner — injected once */
+(function injectSpinKeyframe() {
+    if (document.getElementById('_spin_kf')) return;
+    const s = document.createElement('style');
+    s.id = '_spin_kf';
+    s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+})();
 
 /**
  * Toggle the collapsible activity filter row

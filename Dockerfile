@@ -32,6 +32,7 @@ CMD ["./startup.sh","gunicorn","-c","gunicorn_config.py","run:app"]
 
 ######## Optional: debug target with SSH ########
 FROM app AS debug-ssh
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /var/run/sshd \

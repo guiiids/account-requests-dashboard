@@ -652,13 +652,15 @@
                         class="sidebar-btn-primary">
                         <i class="ph-bold ph-envelope"></i> Reply via Email
                     </button>
-                    {% if request.status != 'Closed' %}
-                    <button onclick="RequestActions.updateStatus('{{ request.request_key }}', 'Closed')"
+                    {% if not request.status.startswith('Closed') %}
+                    <button id="action-btn-{{ request.request_key }}"
+                        onclick="RequestActions.confirmClose('{{ request.request_key }}')"
                         class="sidebar-btn-ghost">
                         <i class="ph-bold ph-check-circle"></i> Close Ticket
                     </button>
                     {% else %}
-                    <button onclick="RequestActions.updateStatus('{{ request.request_key }}', 'Open')"
+                    <button id="action-btn-{{ request.request_key }}"
+                        onclick="RequestActions.updateStatus('{{ request.request_key }}', 'New - Open')"
                         class="sidebar-btn-ghost">
                         <i class="ph-bold ph-arrow-counter-clockwise"></i> Reopen Ticket
                     </button>
@@ -767,6 +769,69 @@
         </div>
         <!-- ... -->
     </div>
+</div>
+
+<!-- Close Ticket Confirmation Modal -->
+<div class="modal-overlay" id="close-confirm-modal-{{ request.request_key }}"
+     style="z-index:10000;">
+    <div class="modal" style="max-width:420px;border-radius:18px;overflow:hidden;padding:0;">
+
+        <!-- Modal Header -->
+        <div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:1.25rem 1.5rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(220,38,38,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="ph-bold ph-check-circle" style="color:#f87171;font-size:1.1rem;"></i>
+                </div>
+                <div>
+                    <div style="font-size:1rem;font-weight:800;color:#fff;">Close Ticket</div>
+                    <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-top:1px;">{{ request.request_key }}</div>
+                </div>
+                <button onclick="RequestActions.dismissCloseConfirm('{{ request.request_key }}')"
+                    style="margin-left:auto;background:rgba(255,255,255,0.08);border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.6);transition:background 0.15s;"
+                    onmouseover="this.style.background='rgba(255,255,255,0.15)'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding:1.5rem;background:#fff;">
+            <p style="font-size:0.875rem;color:#475569;margin:0 0 1.25rem;line-height:1.55;">
+                Please select a closing reason. The ticket will be marked as resolved and
+                removed from the active queue. You can reopen it at any time.
+            </p>
+
+            <label style="display:block;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:0.5rem;">
+                Closing Reason
+            </label>
+            <select id="close-reason-{{ request.request_key }}"
+                style="width:100%;padding:0.6rem 0.875rem;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.85rem;font-weight:600;color:#1e293b;background:#fff;cursor:pointer;outline:none;transition:border-color 0.2s;appearance:none;"
+                onfocus="this.style.borderColor='#0057b8'"
+                onblur="this.style.borderColor='#e2e8f0'">
+                <option value="Closed - Resolved">Resolved - request fulfilled</option>
+                <option value="Closed - Customer unresponsive">Customer unresponsive</option>
+                <option value="Closed - Other">Other reason</option>
+            </select>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding:1rem 1.5rem;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;gap:0.625rem;justify-content:flex-end;">
+            <button onclick="RequestActions.dismissCloseConfirm('{{ request.request_key }}')"
+                style="padding:0.6rem 1.1rem;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;font-size:0.82rem;font-weight:700;color:#64748b;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#f1f5f9'"
+                onmouseout="this.style.background='#fff'">
+                Cancel
+            </button>
+            <button onclick="RequestActions.submitCloseConfirm('{{ request.request_key }}')"
+                style="padding:0.6rem 1.25rem;border-radius:9px;border:none;background:linear-gradient(135deg,#0057b8,#004494);color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(0,87,184,0.3);transition:transform 0.15s,box-shadow 0.15s;display:flex;align-items:center;gap:0.4rem;"
+                onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(0,87,184,0.4)'"
+                onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(0,87,184,0.3)'">
+                <i class="ph-bold ph-check-circle"></i> Confirm Close
+            </button>
+        </div>
+    </div>
+</div>
 </div>
 
 <!-- Email Modal - Still Needed -->

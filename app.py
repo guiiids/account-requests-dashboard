@@ -655,22 +655,57 @@ def api_send_email(request_key):
     if not body:
         return jsonify({'success': False, 'error': 'Email body is required'}), 400
 
+    # Fetch request to build default subject and thread history
+    req = database.get_request_by_key(request_key)
+    
     # Default subject if not provided
     if not subject:
-        req = database.get_request_by_key(request_key)
         subject = f"Re: {req.get('original_subject', 'Your Account Request')}" if req else 'Your Account Request'
 
     user = get_current_user()
 
     try:
+        # Build threaded email payload
+        thread_parts = [body]
+        thread_parts.append("\n\n" + "-"*60 + "\nPrevious Messages\n" + "-"*60)
+        
+        comments = database.get_comments_for_request(request_key)
+        # Iterate from newest to oldest
+        for c in reversed(comments):
+            if c.get('comment_type') not in ('note', 'activity_log'):
+                author = c.get('author_name') or c.get('author_email')
+                date_str = c.get('created_at', '')[:19].replace('T', ' ') if c.get('created_at') else ''
+                subj = c.get('email_subject', '')
+                thread_parts.append(f"\nFrom: {author}")
+                if date_str:
+                    thread_parts.append(f"Date: {date_str} UTC")
+                if subj:
+                    thread_parts.append(f"Subject: {subj}")
+                thread_parts.append(f"\n{c.get('body')}")
+                thread_parts.append("\n" + "-"*40)
+                
+        if req:
+            author = req.get('requester_name') or req.get('requester_email')
+            date_str = req.get('created_at', '')[:19].replace('T', ' ') if req.get('created_at') else ''
+            subj = req.get('original_subject', '')
+            thread_parts.append(f"\nFrom: {author}")
+            if date_str:
+                thread_parts.append(f"Date: {date_str} UTC")
+            if subj:
+                thread_parts.append(f"Subject: {subj}")
+            thread_parts.append(f"\n{req.get('original_body')}")
+            thread_parts.append("\n" + "-"*60)
+            
+        email_payload = "\n".join(thread_parts)
+
         # Send the email
         notification_util.send_email(
             subject=subject,
-            payload=body,
+            payload=email_payload,
             to_list=to_list
         )
 
-        # Log the sent email as a comment (activity stream)
+        # Log the sent email as a comment (activity stream) - only the new body
         recipients_str = ', '.join(to_list)
         database.add_comment(
             request_key,
