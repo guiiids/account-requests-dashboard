@@ -61,12 +61,45 @@
             </div>
 
             <nav class="sidebar-nav">
-                <a href="{{ url_for('dashboard') }}"
-                    class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <i class="ph ph-squares-four"></i>
-                    <span>Overview</span>
-                </a>
+                <div class="nav-group {% if request.endpoint == 'dashboard' %}expanded{% endif %}">
+                    {% set active_email = active_owner_email if active_owner_email is defined else '' %}
+                    <a href="{{ url_for('dashboard') }}"
+                        class="nav-item {% if request.endpoint == 'dashboard' and not active_email %}active{% endif %}">
+                        <i class="ph ph-squares-four"></i>
+                        <span>Agent Queues</span>
+                    </a>
+                    <div class="nav-sub">
+                        <a href="{{ url_for('dashboard', owner_email=current_user.email) }}" class="nav-sub-item {% if active_email == current_user.email %}active{% endif %}">My Queue</a>
+                        {% for user in staff_users %}
+                            {% if user.email != current_user.email %}
+                            <a href="{{ url_for('dashboard', owner_email=user.email) }}" class="nav-sub-item {% if active_email == user.email %}active{% endif %}">Assigned to {{ user.name.split(' ')[0] }}</a>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
 
+                {% if custom_queues %}
+                <div class="nav-group expanded">
+                    <div class="nav-item" style="pointer-events: none;">
+                        <i class="ph ph-folder"></i>
+                        <span>Custom Queues</span>
+                    </div>
+                    <div class="nav-sub">
+                        {% for queue in custom_queues %}
+                        <div style="display: flex; align-items: center; justify-content: space-between;" class="nav-sub-item-wrapper">
+                            <a href="{{ url_for('dashboard') }}?{{ queue.url_query }}" class="nav-sub-item" style="flex: 1;">{{ queue.name }}</a>
+                            {% if current_user.role == 'admin' %}
+                            <form action="{{ url_for('delete_custom_queue', queue_id=queue.id) }}" method="post" style="display:inline; margin-right: 0.5rem;">
+                                <button type="submit" style="background: none; border: none; cursor: pointer; color: var(--text-tertiary);" title="Delete Queue" onclick="return confirm('Delete this custom queue?');">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
                 <a href="{{ url_for('onboarding_guide') }}"
                     class="nav-item {% if request.endpoint == 'onboarding_guide' %}active{% endif %}">

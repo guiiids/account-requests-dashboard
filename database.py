@@ -11,6 +11,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_NAME = 'account_requests.db'
 
 VALID_STATUSES = [
+    'New - Open',
+    'Under Review - Pending Approval',
     'Waiting - Approval needed',
     'Waiting - Information needed',
     'Waiting - for Support',
@@ -19,7 +21,6 @@ VALID_STATUSES = [
     'Closed - Resolved',
     'Closed - Customer unresponsive',
     'Closed - Other',
-    'New - Open'
 ]
 
 
@@ -134,8 +135,41 @@ def init_db():
                 role          TEXT    DEFAULT 'user'
             )
         ''')
+        
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS custom_queues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                url_query TEXT NOT NULL,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         # ────────────────────────────────────────────────────────────────────────
 
+        conn.commit()
+
+
+def get_custom_queues():
+    """Get all custom queues."""
+    with get_db() as conn:
+        return [dict(r) for r in conn.execute('SELECT * FROM custom_queues ORDER BY created_at ASC').fetchall()]
+
+
+def create_custom_queue(name, url_query, created_by):
+    """Create a new custom queue."""
+    with get_db() as conn:
+        conn.execute(
+            'INSERT INTO custom_queues (name, url_query, created_by) VALUES (?, ?, ?)',
+            (name, url_query, created_by)
+        )
+        conn.commit()
+
+
+def delete_custom_queue(queue_id):
+    """Delete a custom queue."""
+    with get_db() as conn:
+        conn.execute('DELETE FROM custom_queues WHERE id = ?', (queue_id,))
         conn.commit()
 
     # Run migrations for existing databases
@@ -290,18 +324,19 @@ def get_request_by_key(request_key):
 # Dashboard category filters → SQL prefix mapping
 _CATEGORY_PREFIXES = {
     'New': 'New%',
+    'Under Review': 'Under Review%',
     'Waiting': 'Waiting%',
     'Closed': 'Closed%',
 }
 
 
-def get_all_requests(status_filter=None, search_query=None, statuses=None, owners=None, start_date=None, end_date=None):
+def get_all_requests(status_filter=None, search_query=None, statuses=None, owners=None, start_date=None, end_date=None, owner_email=None):
     """
     Get all requests, optionally filtered by status and/or search query.
     Supports both category filters ('New', 'Waiting', 'Closed') via
     prefix matching and exact status filters ('New - Open').
     Also supports lists of statuses (Open, Pending, Closed mapping to New, Waiting, Closed),
-    owners (Assigned, Unassigned), and a date range.
+    owners (Assigned, Unassigned), a date range, and filtering by owner_email.
     Returns newest first.
     """
     query = 'SELECT * FROM requests WHERE 1=1'
@@ -319,23 +354,31 @@ def get_all_requests(status_filter=None, search_query=None, statuses=None, owner
             params.append(status_filter)
 
     if statuses:
-        status_conditions = []
-        for s in statuses:
-            if s == 'Open':
-                status_conditions.append("status LIKE 'New%'")
-            elif s == 'Pending':
-                status_conditions.append("status LIKE 'Waiting%'")
-            elif s == 'Closed':
-                status_conditions.append("status LIKE 'Closed%'")
-        if status_conditions:
-            query += ' AND (' + ' OR '.join(status_conditions) + ')'
+        status_placeholders = ','.join(['?'] * len(statuses))
+        query += f' AND status IN ({status_placeholders})'
+        params.extend(statuses)
 
-    if owners:
+    if owner_email:
+        query += ' AND assigned_to = ?'
+        params.append(owner_email.lower().strip())
+    elif owners:
         owner_conditions = []
+        specific_owners = []
+        
         if 'Assigned' in owners:
-            owner_conditions.append("assigned_to IS NOT NULL")
+            owner_conditions.append("(assigned_to IS NOT NULL AND assigned_to != '')")
         if 'Unassigned' in owners:
-            owner_conditions.append("assigned_to IS NULL")
+            owner_conditions.append("(assigned_to IS NULL OR assigned_to = '')")
+            
+        for owner in owners:
+            if owner not in ['Assigned', 'Unassigned']:
+                specific_owners.append(owner)
+                
+        if specific_owners:
+            placeholders = ','.join(['?'] * len(specific_owners))
+            owner_conditions.append(f"assigned_to IN ({placeholders})")
+            params.extend(specific_owners)
+            
         if owner_conditions:
             query += ' AND (' + ' OR '.join(owner_conditions) + ')'
 
@@ -477,7 +520,7 @@ def get_request_counts():
     """Get counts by status category for dashboard display.
 
     Buckets match the prefix-based category system:
-    New (status starts with 'New'), Waiting ('Waiting'), Closed ('Closed').
+    New ('New'), Under Review ('Under Review'), Waiting ('Waiting'), Closed ('Closed').
     """
     with get_db() as conn:
         c = conn.cursor()
@@ -488,7 +531,7 @@ def get_request_counts():
         ''')
         rows = c.fetchall()
 
-    counts = {'New': 0, 'Waiting': 0, 'Closed': 0, 'Total': 0}
+    counts = {'New': 0, 'Under Review': 0, 'Waiting': 0, 'Closed': 0, 'Total': 0}
     for row in rows:
         status_val = row['status'] or ''
         count_val = row['count']
@@ -496,6 +539,8 @@ def get_request_counts():
         # Map granular statuses to dashboard categories by prefix
         if status_val.startswith('New'):
             counts['New'] += count_val
+        elif status_val.startswith('Under Review'):
+            counts['Under Review'] += count_val
         elif status_val.startswith('Waiting'):
             counts['Waiting'] += count_val
         elif status_val.startswith('Closed'):
@@ -510,6 +555,40 @@ def get_request_counts():
         counts['Total'] += count_val
 
     return counts
+
+
+def get_distinct_filter_values():
+    """Return the distinct statuses and assigned-to owners that actually exist
+    in the requests table.  Used to build dynamic filter panels so the UI
+    never shows options that have zero matching rows.
+
+    Returns:
+        dict with keys 'statuses' (sorted list of str) and
+        'owners' (list of dicts [{email, name}, ...]).
+    """
+    with get_db() as conn:
+        c = conn.cursor()
+
+        # Distinct non-null statuses
+        c.execute("SELECT DISTINCT status FROM requests WHERE status IS NOT NULL ORDER BY status")
+        statuses = [r['status'] for r in c.fetchall()]
+
+        # Distinct non-empty owners (email addresses)
+        c.execute(
+            "SELECT DISTINCT assigned_to FROM requests "
+            "WHERE assigned_to IS NOT NULL AND assigned_to != '' "
+            "ORDER BY assigned_to"
+        )
+        owner_emails = [r['assigned_to'] for r in c.fetchall()]
+
+    # Resolve emails → names from staff table
+    staff_lookup = {u['email']: u['name'] for u in get_staff_users()}
+    owners = [
+        {'email': e, 'name': staff_lookup.get(e, e.split('@')[0])}
+        for e in owner_emails
+    ]
+
+    return {'statuses': statuses, 'owners': owners}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

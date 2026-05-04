@@ -28,6 +28,18 @@
         </div>
     </div>
 
+    <!-- Under Review -->
+    <div class="stat-card {% if current_filter == 'Under Review' %}active{% endif %}"
+        onclick="filterByStatus('Under Review')">
+        <div class="stat-icon-wrapper bg-purple-light text-purple">
+            <i class="ph ph-magnifying-glass"></i>
+        </div>
+        <div class="stat-content">
+            <div class="stat-value text-purple">{{ counts['Under Review'] }}</div>
+            <div class="stat-label">Under Review</div>
+        </div>
+    </div>
+
     <!-- Waiting -->
     <div class="stat-card {% if current_filter == 'Waiting' %}active{% endif %}"
         onclick="filterByStatus('Waiting')">
@@ -234,28 +246,22 @@
                         <i class="ph ph-caret-up"></i>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        {% for status in filter_values.statuses %}
                         <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-                            <input type="checkbox" name="statuses" value="Open" {% if statuses and 'Open' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
-                            Open
+                            <input type="checkbox" name="statuses" value="{{ status }}" {% if statuses and status in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            {{ status }}
                         </label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-                            <input type="checkbox" name="statuses" value="Pending" {% if statuses and 'Pending' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
-                            Pending
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-                            <input type="checkbox" name="statuses" value="Closed" {% if statuses and 'Closed' in statuses %}checked{% endif %} style="accent-color: var(--brand-primary);">
-                            Closed
-                        </label>
+                        {% endfor %}
                     </div>
                 </div>
 
-                <!-- Owner -->
+                <!-- Assigned To -->
                 <div style="margin-bottom: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem;">
-                        <span>Owner</span>
+                        <span>Assigned To</span>
                         <i class="ph ph-caret-up"></i>
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto; padding-right: 0.25rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
                             <input type="checkbox" name="owners" value="Assigned" {% if owners and 'Assigned' in owners %}checked{% endif %} style="accent-color: var(--brand-primary);">
                             Assigned
@@ -264,6 +270,15 @@
                             <input type="checkbox" name="owners" value="Unassigned" {% if owners and 'Unassigned' in owners %}checked{% endif %} style="accent-color: var(--brand-primary);">
                             Unassigned
                         </label>
+                        {% if filter_values.owners %}
+                        <div style="height: 1px; background-color: var(--border-color); margin: 0.25rem 0;"></div>
+                        {% for owner in filter_values.owners %}
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                            <input type="checkbox" name="owners" value="{{ owner.email }}" {% if owners and owner.email in owners %}checked{% endif %} style="accent-color: var(--brand-primary);">
+                            {{ owner.name }}
+                        </label>
+                        {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
 
@@ -294,6 +309,19 @@
                     <button type="submit" class="btn btn-primary" style="flex: 1; padding: 0.4rem; font-size: 0.85rem;">Apply</button>
                 </div>
             </form>
+
+            {% if current_user and current_user.role == 'admin' %}
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
+                <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 500;">Admin: Create Custom Queue</label>
+                <form action="{{ url_for('create_custom_queue') }}" method="POST">
+                    <input type="hidden" name="url_query" value="{{ request.query_string.decode('utf-8') }}">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" name="queue_name" placeholder="Queue Name" required style="flex: 1; min-width: 0; padding: 0.4rem 0.5rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem;">
+                        <button type="submit" class="btn btn-secondary" style="padding: 0.4rem 0.6rem; font-size: 0.85rem;" title="Save current filters as a custom queue">Save</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -309,7 +337,7 @@
                     <i class="ph ph-swap"></i> Status <i class="ph ph-caret-down" style="font-size:0.7rem;"></i>
                 </button>
                 <div id="bulk-dropdown-status" style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; background:#fff; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); min-width:240px; overflow:hidden; z-index:101;">
-                    {% for st in ['New - Open','Waiting - Approval needed','Waiting - Information needed','Waiting - for Support','Waiting - Answered','Waiting - Institution clarification','Closed - Resolved','Closed - Customer unresponsive','Closed - Other'] %}
+                    {% for st in valid_statuses %}
                     <button onclick="BulkOps.changeStatus('{{ st }}')" style="display:block; width:100%; text-align:left; padding:0.55rem 1rem; border:none; background:none; cursor:pointer; font-size:0.8rem; color:var(--text-primary); font-weight:500;" onmouseover="this.style.background='var(--surface-50)'" onmouseout="this.style.background='none'">{{ st }}</button>
                     {% endfor %}
                 </div>

@@ -2,7 +2,7 @@
 Account Requests Dashboard - Flask Application
 A staff-only dashboard for managing iLab account signup requests.
 """
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_from_directory, flash
 import database
 import audit
 import email_parser
@@ -120,7 +120,9 @@ def inject_user():
     """Inject current user and constants into all templates."""
     return {
         'current_user': get_current_user(),
-        'valid_statuses': database.VALID_STATUSES
+        'valid_statuses': database.VALID_STATUSES,
+        'custom_queues': database.get_custom_queues(),
+        'staff_users': database.get_staff_users()
     }
 
 
@@ -207,6 +209,8 @@ def status_color_class(status):
     status = (status or '').lower()
     if status.startswith('new'):
         return 'bg-blue-50 text-blue-700 border-blue-200'
+    elif status.startswith('under review'):
+        return 'bg-purple-50 text-purple-700 border-purple-200'
     elif status.startswith('waiting'):
         return 'bg-amber-50 text-amber-700 border-amber-200'
     elif status.startswith('closed'):
@@ -417,6 +421,7 @@ def dashboard():
     """Main dashboard showing all account requests."""
     status_filter = request.args.get('status', 'All')
     search_query = request.args.get('search', '')
+    owner_email = request.args.get('owner_email', '')
 
     statuses = request.args.getlist('statuses')
     owners = request.args.getlist('owners')
@@ -429,10 +434,12 @@ def dashboard():
         statuses=statuses if statuses else None,
         owners=owners if owners else None,
         start_date=start_date if start_date else None,
-        end_date=end_date if end_date else None
+        end_date=end_date if end_date else None,
+        owner_email=owner_email if owner_email else None
     )
 
     counts = database.get_request_counts()
+    filter_values = database.get_distinct_filter_values()
 
     return render_template(
         'dashboard.html',
@@ -444,8 +451,41 @@ def dashboard():
         owners=owners,
         start_date=start_date,
         end_date=end_date,
-        staff_users=database.get_staff_users()
+        staff_users=database.get_staff_users(),
+        active_owner_email=owner_email,
+        filter_values=filter_values
     )
+
+
+@app.route('/custom_queue/create', methods=['POST'])
+@staff_required
+def create_custom_queue():
+    user = get_current_user()
+    if user['role'] != 'admin':
+        flash("Admin privileges required to create custom queues.", 'error')
+        return redirect(url_for('dashboard'))
+    
+    name = request.form.get('queue_name')
+    url_query = request.form.get('url_query')
+    if name and url_query:
+        database.create_custom_queue(name, url_query, user['email'])
+        flash(f"Custom queue '{name}' created successfully.", 'success')
+    
+    # Redirect back to the new custom queue or dashboard
+    return redirect(url_for('dashboard') + '?' + url_query)
+
+
+@app.route('/custom_queue/delete/<int:queue_id>', methods=['POST'])
+@staff_required
+def delete_custom_queue(queue_id):
+    user = get_current_user()
+    if user['role'] != 'admin':
+        flash("Admin privileges required to delete custom queues.", 'error')
+        return redirect(url_for('dashboard'))
+    
+    database.delete_custom_queue(queue_id)
+    flash("Custom queue deleted successfully.", 'success')
+    return redirect(url_for('dashboard'))
 
 
 @app.route('/other/request/<request_key>')

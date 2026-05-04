@@ -660,6 +660,7 @@
                             <span style="display:flex;align-items:center;gap:0.5rem;">
                                 <span class="option-dot
                                     {% if request.status.startswith('New') %}dot-open
+                                    {% elif request.status.startswith('Under Review') %}dot-person
                                     {% elif request.status.startswith('Waiting') %}dot-progress
                                     {% elif request.status.startswith('Closed') %}dot-closed
                                     {% else %}dot-open{% endif %}"></span>
@@ -673,6 +674,7 @@
                                  onclick="selectStatus('{{ request.request_key }}', '{{ status }}')">
                                 <span class="option-dot
                                     {% if status.startswith('New') %}dot-open
+                                    {% elif status.startswith('Under Review') %}dot-person
                                     {% elif status.startswith('Waiting') %}dot-progress
                                     {% elif status.startswith('Closed') %}dot-closed
                                     {% else %}dot-open{% endif %}"></span> {{ status }}
@@ -795,7 +797,8 @@
     function selectStatus(key, value) {
         // Update display
         let dotClass = 'dot-open';
-        if (value.startsWith('Waiting')) dotClass = 'dot-progress';
+        if (value.startsWith('Under Review')) dotClass = 'dot-person';
+        else if (value.startsWith('Waiting')) dotClass = 'dot-progress';
         else if (value.startsWith('Closed')) dotClass = 'dot-closed';
         
         const triggerContent = document.querySelector('#status-trigger-' + key + ' span span:first-child');
